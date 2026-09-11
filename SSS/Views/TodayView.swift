@@ -9,6 +9,7 @@ struct TodayView: View {
     @State private var selectedDay: Date = Ledger.calendar.startOfDay(for: .now)
     @State private var visibleMonth: Date = Ledger.calendar.startOfDay(for: .now)
     @State private var showingDay = false
+    @State private var showingSettings = false
 
     private let cal = Ledger.calendar
     private var today: Date { cal.startOfDay(for: .now) }
@@ -33,6 +34,12 @@ struct TodayView: View {
             Spacer(minLength: 0)
         }
         .background(Theme.ground)
+        .sheet(isPresented: $showingSettings) {
+            SettingsView()
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.sheet)
+        }
         .sheet(isPresented: $showingDay) {
             DayDrawerView(date: selectedDay)
                 .presentationDragIndicator(.visible)
@@ -51,8 +58,23 @@ struct TodayView: View {
                 Label9("DAY STREAK · BEST \(Ledger.longestStreak(expenses: expenses))", size: 14)
             }
             Spacer()
-            balancePill
+            HStack(spacing: 10) {
+                settingsButton
+                balancePill
+            }
         }
+    }
+
+    private var settingsButton: some View {
+        Button { showingSettings = true } label: {
+            Image(systemName: "gearshape")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(Theme.secondary)
+                .frame(width: 44, height: 44)
+                .glassEffect(.regular.interactive(), in: .circle)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Settings")
     }
 
     private var balancePill: some View {
