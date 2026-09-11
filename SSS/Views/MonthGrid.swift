@@ -36,19 +36,19 @@ struct MonthGrid: View {
             // essentials were bought — the amount and the streak are separate
             // facts about a day, and only one of them is the number.
             Text(amountText(cell.state))
-                .font(.system(size: 12, weight: isCleanDay(cell.state) ? .semibold : .regular))
+                .font(.system(size: 16, weight: isCleanDay(cell.state) ? .semibold : .regular))
                 .monospacedDigit()
                 .foregroundStyle(amountColour(cell.state))
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .frame(height: 18)
+                .minimumScaleFactor(0.75)
+                .frame(height: 20)
 
             Text(cell.dayNumber.map(String.init) ?? "")
-                .font(.system(size: 10, weight: isToday ? .semibold : .regular))
+                .font(.system(size: 9, weight: isToday ? .semibold : .regular))
                 .monospacedDigit()
                 .foregroundStyle(numberColour(cell, isToday: isToday))
         }
-        .frame(maxWidth: .infinity, minHeight: 44)
+        .frame(maxWidth: .infinity, minHeight: 46)
         .background {
             if isSelected {
                 RoundedRectangle(cornerRadius: 13, style: .continuous)
