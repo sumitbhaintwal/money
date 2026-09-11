@@ -53,9 +53,13 @@ struct DotGrid: View {
         }
         .frame(maxWidth: .infinity, minHeight: 48)
         .contentShape(Rectangle())
-        .overlay {
+        .background {
             if isSelected {
-                Rectangle().strokeBorder(Theme.lit, lineWidth: 1)
+                // A filled squircle rather than a hairline box: the 1pt border
+                // aliased against the dots and read as harsh.
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .fill(Theme.selection)
+                    .padding(.horizontal, 2)
             }
         }
         .onTapGesture {

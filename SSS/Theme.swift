@@ -6,6 +6,7 @@ enum Theme {
     static let ground      = Color(hex: 0xFFFFFF)   // root screens
     static let sheet       = Color(hex: 0xF4F4F4)   // modals, lifted off the root
     static let key         = Color(hex: 0xEAEAEA)   // keypad keys
+    static let selection   = Color(hex: 0xECECEC)   // selected day in the month grid
     static let futureDot   = Color(hex: 0xE6E6E6)
     static let rowRule     = Color(hex: 0xE8E8E8)
     static let rule        = Color(hex: 0xD8D8D8)   // section rules
