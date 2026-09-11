@@ -70,9 +70,19 @@ struct MonthGrid: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            if let date = cell.date { onSelect(date) }
+            if canOpen(cell), let date = cell.date { onSelect(date) }
         }
         .accessibilityLabel(accessibilityLabel(for: cell))
+        .accessibilityAddTraits(canOpen(cell) ? .isButton : [])
+    }
+
+    /// A day that has not happened has nothing to show. Gated on the date
+    /// rather than the cell state, because `.future` also covers past days
+    /// from before the first expense — those are empty, but they are real and
+    /// still open.
+    private func canOpen(_ cell: DayCell) -> Bool {
+        guard let date = cell.date else { return false }
+        return date <= Ledger.calendar.startOfDay(for: .now)
     }
 
     // MARK: - Styling
