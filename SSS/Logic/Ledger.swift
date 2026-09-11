@@ -5,7 +5,7 @@ import Foundation
 struct DayCell: Identifiable {
     enum State: Equatable {
         case blank                 // padding before the 1st / after the last
-        case clean                 // nothing discretionary
+        case clean(paise: Int)     // nothing discretionary, but essentials may have been
         case spent(paise: Int)
         case future
     }
@@ -92,9 +92,8 @@ enum Ledger {
                 state = .future
             } else {
                 let onDay = days[cal.startOfDay(for: date)] ?? []
-                state = isClean(onDay)
-                    ? .clean
-                    : .spent(paise: onDay.reduce(0) { $0 + $1.mySharePaise })
+                let spend = onDay.reduce(0) { $0 + $1.mySharePaise }
+                state = isClean(onDay) ? .clean(paise: spend) : .spent(paise: spend)
             }
             cells.append(DayCell(id: cells.count, date: date, dayNumber: day, state: state))
         }

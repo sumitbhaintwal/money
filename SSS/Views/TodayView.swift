@@ -23,7 +23,7 @@ struct TodayView: View {
                 .padding(.horizontal, 24)
                 .padding(.top, 40)
 
-            DotGrid(cells: cells, selected: selectedDay) { day in
+            MonthGrid(cells: cells, selected: selectedDay) { day in
                 selectedDay = day
                 showingDay = true
             }
