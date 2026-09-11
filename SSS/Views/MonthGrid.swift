@@ -36,7 +36,9 @@ struct MonthGrid: View {
             // essentials were bought — the amount and the streak are separate
             // facts about a day, and only one of them is the number.
             Text(amountText(cell.state))
-                .font(.system(size: 16, weight: isCleanDay(cell.state) ? .semibold : .regular))
+                // 14, not 16: "0.38k" is five glyphs and at 16pt it filled the whole
+                // 46pt column, so neighbouring days ran together.
+                .font(.system(size: 14, weight: isCleanDay(cell.state) ? .semibold : .regular))
                 .monospacedDigit()
                 .foregroundStyle(amountColour(cell.state))
                 .lineLimit(1)

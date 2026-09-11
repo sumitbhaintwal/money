@@ -39,7 +39,13 @@ enum Money {
             return (text.hasSuffix(".0") ? String(text.dropLast(2)) : text) + suffix
         }
         switch rupees {
-        case ..<1_000:   return "\(rupees)"
+        case ..<1_000:
+            // Two decimals below a thousand, so ₹100 and ₹140 stay distinct —
+            // one decimal would collapse both to 0.1k.
+            let k = ((Double(rupees) / 1_000) * 100).rounded() / 100
+            // ₹999 rounds to 1.00k, which would read as two renderings of the
+            // same value next to the branch below. Hand it over instead.
+            return k >= 1 ? "1k" : String(format: "%.2f", k) + "k"
         case ..<10_000:  return trim(Double(rupees) / 1_000, "k")
         case ..<100_000: return "\(rupees / 1_000)k"
         default:         return trim(Double(rupees) / 100_000, "L")
