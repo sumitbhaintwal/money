@@ -41,20 +41,18 @@ struct DotGrid: View {
         let isSelected = cell.date.map { Ledger.calendar.isDate($0, inSameDayAs: selected ?? .distantPast) } ?? false
         let isToday = cell.date.map { Ledger.calendar.isDateInToday($0) } ?? false
 
-        // Layered, not stacked — but offset rather than concentric. Dead centre
-        // put the dot in the gap between two digits, so 12 read as "1·2", and
-        // it swallowed single digits whole. Overlapping the numeral's top edge
-        // keeps both legible.
-        ZStack {
+        // Dots share a bottom line and grow upward, so a 4pt dot and a 28pt
+        // dot rest on the same edge and overlap their number by the same
+        // amount. Centre-aligning them made every cell relate differently.
+        VStack(spacing: -3) {
+            dot(for: cell.state)
+                .frame(height: 28, alignment: .bottom)
             Text(cell.dayNumber.map(String.init) ?? "")
                 .font(.system(size: 26, weight: isToday ? .medium : .regular))
                 .monospacedDigit()
                 .foregroundStyle(numberColour(cell, isToday: isToday))
-                .offset(y: 9)
-            dot(for: cell.state)
-                .offset(y: -7)
         }
-        .frame(maxWidth: .infinity, minHeight: 50)
+        .frame(maxWidth: .infinity, minHeight: 48)
         .contentShape(Rectangle())
         .overlay {
             if isSelected {
@@ -86,10 +84,13 @@ struct DotGrid: View {
         case .clean:
             Circle().fill(Theme.lit).frame(width: 13, height: 13)
         case .future:
-            Circle().fill(Theme.futureDot).frame(width: 4, height: 4)
+            // No mark at all. A 4pt speck over every unrecorded day read as
+            // dirt across three rows of the month and carried no information
+            // the pale number wasn't already carrying.
+            Color.clear.frame(width: 0, height: 0)
         case let .spent(paise):
             let ratio = min(1, Double(paise) / Double(referencePaise))
-            let size = 8 + 22 * ratio
+            let size = 8 + 20 * ratio
             Circle().fill(Theme.spendDot).frame(width: size, height: size)
         }
     }
