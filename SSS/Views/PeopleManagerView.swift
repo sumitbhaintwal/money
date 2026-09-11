@@ -3,6 +3,7 @@ import SwiftData
 
 struct PeopleManagerView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(SessionStore.self) private var session
     @Query(sort: \Person.name) private var people: [Person]
     @Query private var expenses: [Expense]
 
@@ -45,7 +46,23 @@ struct PeopleManagerView: View {
             .buttonStyle(.glassProminent)
             .tint(Theme.lit)
             .padding(.horizontal, 24)
-            .padding(.bottom, 28)
+            .padding(.bottom, 14)
+
+            // The app has no settings screen, so the account sits here for now.
+            if let account = session.account {
+                HStack {
+                    Text("Signed in as \(account.displayPhone)")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.dim)
+                    Spacer()
+                    Button { session.signOut() } label: {
+                        Label9("SIGN OUT", color: Theme.ink, size: 11)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 24)
+            }
         }
         .background(Theme.sheet)
         .sheet(item: $editingPerson) { PersonEditorView(person: $0) }

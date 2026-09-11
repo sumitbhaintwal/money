@@ -13,7 +13,11 @@ meal or a prescription, which is the one way a no-spend streak can do real harm.
 
 ## Deliberate constraints
 
-- **Local only.** SwiftData on device. No backend, no accounts, no sync, no network code.
+- **Local only.** SwiftData on device. No sync, and the ledger never leaves the phone.
+- **Sign-in is stubbed.** Welcome and OTP sign-in (phone *and* email, both mandatory)
+  exist as screens against `AuthService`; `StubAuthService` accepts any six digits.
+  There is no backend yet, and the token lands in UserDefaults — it belongs in the
+  Keychain the moment it grants anything.
 - **Single-player.** India is ~92% Android, so the people you split with mostly can't run
   the app. You keep the ledger; they never need to install anything. Reminders go out as
   plain messages, settlement hands off to UPI.

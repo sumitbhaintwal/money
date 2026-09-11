@@ -4,6 +4,21 @@ import SwiftData
 enum AppTab: Hashable { case today, money, people }
 
 struct RootView: View {
+    @Environment(SessionStore.self) private var session
+    @State private var started = false
+
+    var body: some View {
+        if session.isSignedIn {
+            MainTabsView()
+        } else if started {
+            SignInView()
+        } else {
+            WelcomeView { started = true }
+        }
+    }
+}
+
+struct MainTabsView: View {
     @State private var tab: AppTab = .today
     @State private var addingExpense = false
 

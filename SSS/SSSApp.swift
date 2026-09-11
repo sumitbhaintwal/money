@@ -4,6 +4,7 @@ import SwiftData
 @main
 struct SSSApp: App {
     private let container: ModelContainer
+    @State private var session = SessionStore()
 
     init() {
         do {
@@ -19,6 +20,8 @@ struct SSSApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                .environment(session)
+                .tint(Theme.lit)
                 .preferredColorScheme(.light)
         }
         .modelContainer(container)
