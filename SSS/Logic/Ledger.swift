@@ -139,8 +139,10 @@ enum Ledger {
         calendar cal: Calendar = calendar
     ) -> Int {
         guard let interval = cal.dateInterval(of: .month, for: month) else { return 0 }
+        // DateInterval.contains is closed at both ends, so an expense stamped
+        // midnight on the 1st would count in this month *and* the previous one.
         return expenses
-            .filter { interval.contains($0.spentAt) }
+            .filter { $0.spentAt >= interval.start && $0.spentAt < interval.end }
             .reduce(0) { $0 + $1.mySharePaise }
     }
 

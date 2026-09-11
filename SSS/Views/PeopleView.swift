@@ -4,6 +4,7 @@ import SwiftData
 struct PeopleView: View {
     @Query(sort: \Expense.spentAt, order: .reverse) private var expenses: [Expense]
     @State private var settling: PersonBalance?
+    @State private var managing = false
 
     private var balances: [PersonBalance] { Balances.all(in: expenses) }
     private var owedToMe: [PersonBalance] { balances.filter(\.theyOweMe) }
@@ -41,6 +42,11 @@ struct PeopleView: View {
                 .padding(.bottom, 28)
         }
         .background(Theme.ground)
+        .sheet(isPresented: $managing) {
+            PeopleManagerView()
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.sheet)
+        }
         .sheet(item: $settling) { balance in
             SettleView(balance: balance)
                 .presentationDragIndicator(.visible)
@@ -52,6 +58,12 @@ struct PeopleView: View {
         HStack {
             Label9("PEOPLE", size: 14)
             Spacer()
+            Button { managing = true } label: {
+                Label9("MANAGE", color: Theme.ink, size: 13)
+                    .frame(height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
         .frame(height: 44)
     }

@@ -20,6 +20,20 @@ struct AddExpenseView: View {
     @State private var newPersonName = ""
     @FocusState private var noteFocused: Bool
 
+    /// nil creates a new expense; otherwise the sheet edits this one in place.
+    private let editing: Expense?
+
+    init(editing: Expense? = nil) {
+        self.editing = editing
+        let split = (editing?.shares.count ?? 0) > 1
+        _digits = State(initialValue: editing.map { String($0.amountPaise / 100) } ?? "")
+        _note = State(initialValue: editing?.note ?? "")
+        _isEssential = State(initialValue: editing?.isEssential ?? false)
+        _isSplit = State(initialValue: split)
+        _pane = State(initialValue: split ? .people : .keypad)
+        _chosen = State(initialValue: Set((editing?.shares ?? []).compactMap { $0.person?.persistentModelID }))
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             headerRow.padding(.horizontal, 24).padding(.top, 22)
@@ -51,7 +65,7 @@ struct AddExpenseView: View {
 
     private var headerRow: some View {
         HStack {
-            Label9("NEW EXPENSE · \(todayLabel)", size: 14)
+            Label9(headerTitle, size: 14)
             Spacer()
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
@@ -259,15 +273,17 @@ struct AddExpenseView: View {
     private var ctaTitle: String {
         guard hasAmount else { return "ENTER AN AMOUNT" }
         if isSplit && chosen.isEmpty { return "PICK SOMEONE" }
+        if editing != nil { return "SAVE CHANGES" }
         if isSplit { return "SPLIT \(Money.rupees(amountPaise))" }
         return "SAVE \(Money.rupees(amountPaise))"
     }
 
-    private var todayLabel: String {
+    private var headerTitle: String {
         let f = DateFormatter()
         f.calendar = Ledger.calendar
         f.dateFormat = "MMM d"
-        return f.string(from: .now).uppercased()
+        let day = f.string(from: editing?.spentAt ?? .now).uppercased()
+        return "\(editing == nil ? "NEW EXPENSE" : "EDIT EXPENSE") · \(day)"
     }
 
     // MARK: - Actions
@@ -287,23 +303,46 @@ struct AddExpenseView: View {
     }
 
     private func save() {
-        guard hasAmount else { return }
-        if isSplit && chosen.isEmpty { return }
+        guard canSave else { return }
+        let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        let expense = Expense(
-            amountPaise: amountPaise,
-            note: note.trimmingCharacters(in: .whitespacesAndNewlines),
-            spentAt: .now,
-            isEssential: isEssential
-        )
-        context.insert(expense)
+        let expense: Expense
+        // Editing rebuilds the shares wholesale, so remember who had already
+        // squared up — an edit must not silently un-settle a paid debt.
+        var alreadySettled: [PersistentIdentifier: Date] = [:]
+
+        if let editing {
+            expense = editing
+            for share in editing.shares {
+                if let person = share.person, let settled = share.settledAt {
+                    alreadySettled[person.persistentModelID] = settled
+                }
+            }
+            editing.shares.forEach(context.delete)
+            editing.shares = []
+            expense.amountPaise = amountPaise
+            expense.note = trimmed
+            expense.isEssential = isEssential
+        } else {
+            expense = Expense(
+                amountPaise: amountPaise,
+                note: trimmed,
+                spentAt: .now,
+                isEssential: isEssential
+            )
+            context.insert(expense)
+        }
 
         if isSplit && !chosen.isEmpty {
             let participants = people.filter { chosen.contains($0.persistentModelID) }
             let amounts = Split.evenly(totalPaise: amountPaise, among: participants.count + 1)
             var rows = [Share(amountPaise: amounts[0])]
             for (index, person) in participants.enumerated() {
-                rows.append(Share(amountPaise: amounts[index + 1], person: person))
+                rows.append(Share(
+                    amountPaise: amounts[index + 1],
+                    person: person,
+                    settledAt: alreadySettled[person.persistentModelID]
+                ))
             }
             rows.forEach(context.insert)
             expense.shares = rows
