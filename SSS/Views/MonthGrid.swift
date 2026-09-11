@@ -8,6 +8,16 @@ struct MonthGrid: View {
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
     private let weekdays = ["M", "T", "W", "T", "F", "S", "S"]
 
+    /// Colour intensity is scaled against the month's own biggest day, with a
+    /// ₹1,000 floor so a quiet month does not paint a small expense as severe.
+    private var referencePaise: Int {
+        let biggest = cells.compactMap { cell -> Int? in
+            if case let .spent(paise) = cell.state { return paise }
+            return nil
+        }.max() ?? 0
+        return max(biggest, 100_000)
+    }
+
     var body: some View {
         VStack(spacing: 12) {
             LazyVGrid(columns: columns, spacing: 0) {
@@ -69,8 +79,12 @@ struct MonthGrid: View {
 
     private func amountText(_ state: DayCell.State) -> String {
         switch state {
-        case .blank, .future:                       return ""
-        case let .clean(paise), let .spent(paise):  return Money.compact(paise)
+        case .blank, .future:  return ""
+        case let .clean(paise):
+            // Nothing went out at all — a dash is quieter than 0.00k, and four
+            // of those in a row was a lot of ink for an empty day.
+            return paise == 0 ? "–" : Money.compact(paise)
+        case let .spent(paise): return Money.compact(paise)
         }
     }
 
@@ -81,10 +95,24 @@ struct MonthGrid: View {
 
     private func amountColour(_ state: DayCell.State) -> Color {
         switch state {
-        case .blank, .future: return .clear
-        case .clean:          return Theme.ink
-        case .spent:          return Theme.muted
+        case .blank, .future:   return .clear
+        case .clean:            return Theme.clean
+        case let .spent(paise): return spendColour(paise)
         }
+    }
+
+    /// Low to high across the month, so a heavy day is visible before it is read
+    /// — the job dot size used to do.
+    private func spendColour(_ paise: Int) -> Color {
+        let t = min(1, Double(paise) / Double(referencePaise))
+        func mix(_ from: Double, _ to: Double) -> Double { from + (to - from) * t }
+        return Color(
+            .sRGB,
+            red:   mix(0xB5 / 255, 0xA3 / 255),
+            green: mix(0x78 / 255, 0x3A / 255),
+            blue:  mix(0x3A / 255, 0x1E / 255),
+            opacity: 1
+        )
     }
 
     private func numberColour(_ cell: DayCell, isToday: Bool) -> Color {

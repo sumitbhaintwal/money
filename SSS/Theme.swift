@@ -19,6 +19,13 @@ enum Theme {
     static let body        = Color(hex: 0x232323)
     static let ink         = Color(hex: 0x121212)   // primary text
     static let lit         = Color(hex: 0x000000)   // the accent
+
+    // The only hue in the app. Clean days read as good; spending is scaled by
+    // weight rather than painted as a fault — a ledger that calls every
+    // purchase an error is one people stop opening.
+    static let clean       = Color(hex: 0x1B7F4D)   // a day with no discretionary spend
+    static let spendLow    = Color(hex: 0xB5783A)   // a quiet day
+    static let spendHigh   = Color(hex: 0xA33A1E)   // the heaviest day of the month
     static let onLit       = Color(hex: 0xFFFFFF)   // ink that sits on it
 
     /// Stand-ins for Barlow Condensed / IBM Plex Mono until the real faces are
