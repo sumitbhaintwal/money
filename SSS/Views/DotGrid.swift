@@ -28,7 +28,7 @@ struct DotGrid: View {
                         .foregroundStyle(Theme.dim)
                 }
             }
-            LazyVGrid(columns: columns, spacing: 6) {
+            LazyVGrid(columns: columns, spacing: 4) {
                 ForEach(cells) { cell in
                     cellView(cell)
                 }
@@ -39,11 +39,19 @@ struct DotGrid: View {
     @ViewBuilder
     private func cellView(_ cell: DayCell) -> some View {
         let isSelected = cell.date.map { Ledger.calendar.isDate($0, inSameDayAs: selected ?? .distantPast) } ?? false
+        let isToday = cell.date.map { Ledger.calendar.isDateInToday($0) } ?? false
 
-        ZStack {
-            dot(for: cell.state)
+        VStack(spacing: 3) {
+            // Fixed height so every number in a row sits on one baseline,
+            // however big the dot above it is.
+            ZStack { dot(for: cell.state) }
+                .frame(height: 30)
+            Text(cell.dayNumber.map(String.init) ?? "")
+                .font(.system(size: 10, weight: isToday ? .semibold : .regular))
+                .monospacedDigit()
+                .foregroundStyle(numberColour(cell, isToday: isToday))
         }
-        .frame(maxWidth: .infinity, minHeight: 44)
+        .frame(maxWidth: .infinity, minHeight: 48)
         .contentShape(Rectangle())
         .overlay {
             if isSelected {
@@ -54,6 +62,18 @@ struct DotGrid: View {
             if let date = cell.date { onSelect(date) }
         }
         .accessibilityLabel(accessibilityLabel(for: cell))
+    }
+
+    /// Deliberately quiet: the dot carries the meaning, the number is only
+    /// there so you can find a date. Today is the one that steps forward,
+    /// since nothing else marks it once the selection moves away.
+    private func numberColour(_ cell: DayCell, isToday: Bool) -> Color {
+        if isToday { return Theme.body }
+        switch cell.state {
+        case .blank:            return .clear
+        case .future:           return Theme.outline
+        case .clean, .spent:    return Theme.dim
+        }
     }
 
     @ViewBuilder
