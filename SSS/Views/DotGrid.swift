@@ -41,17 +41,20 @@ struct DotGrid: View {
         let isSelected = cell.date.map { Ledger.calendar.isDate($0, inSameDayAs: selected ?? .distantPast) } ?? false
         let isToday = cell.date.map { Ledger.calendar.isDateInToday($0) } ?? false
 
-        VStack(spacing: 3) {
-            // Fixed height so every number in a row sits on one baseline,
-            // however big the dot above it is.
-            ZStack { dot(for: cell.state) }
-                .frame(height: 30)
+        // Layered, not stacked — but offset rather than concentric. Dead centre
+        // put the dot in the gap between two digits, so 12 read as "1·2", and
+        // it swallowed single digits whole. Overlapping the numeral's top edge
+        // keeps both legible.
+        ZStack {
             Text(cell.dayNumber.map(String.init) ?? "")
-                .font(.system(size: 10, weight: isToday ? .semibold : .regular))
+                .font(.system(size: 26, weight: isToday ? .medium : .regular))
                 .monospacedDigit()
                 .foregroundStyle(numberColour(cell, isToday: isToday))
+                .offset(y: 9)
+            dot(for: cell.state)
+                .offset(y: -7)
         }
-        .frame(maxWidth: .infinity, minHeight: 48)
+        .frame(maxWidth: .infinity, minHeight: 50)
         .contentShape(Rectangle())
         .overlay {
             if isSelected {
@@ -64,15 +67,14 @@ struct DotGrid: View {
         .accessibilityLabel(accessibilityLabel(for: cell))
     }
 
-    /// Deliberately quiet: the dot carries the meaning, the number is only
-    /// there so you can find a date. Today is the one that steps forward,
-    /// since nothing else marks it once the selection moves away.
+    /// Light enough to sit under a dot without fighting it. Today steps
+    /// forward slightly, since nothing else marks it once the selection moves.
     private func numberColour(_ cell: DayCell, isToday: Bool) -> Color {
-        if isToday { return Theme.body }
+        if isToday { return Theme.dim }
         switch cell.state {
         case .blank:            return .clear
-        case .future:           return Theme.outline
-        case .clean, .spent:    return Theme.dim
+        case .future:           return Theme.futureDot
+        case .clean, .spent:    return Theme.outline
         }
     }
 
