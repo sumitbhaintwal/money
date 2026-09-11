@@ -16,7 +16,7 @@ struct SignInView: View {
     @State private var resendIn = 0
     @FocusState private var focus: Field?
 
-    private let auth: AuthService = StubAuthService()
+    private let auth: AuthService = HTTPAuthService()
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -80,8 +80,8 @@ struct SignInView: View {
             return "We send one code to your phone and your inbox. Both are needed."
         case .code:
             guard let challenge else { return "" }
-            let shown = Account(phone: challenge.phone, email: challenge.email, token: "").displayPhone
-            return "Sent to \(shown) and \(challenge.email)."
+            let shown = Account(id: "", phone: challenge.phone, email: challenge.email).displayPhone
+            return "Sent to \(shown), and the code is in \(challenge.email)."
         }
     }
 
@@ -164,7 +164,7 @@ struct SignInView: View {
             .disabled(resendIn > 0 || busy)
 
             #if DEBUG
-            Text("Stub auth: any six digits will do.")
+            Text(AppConfig.apiBaseURL.absoluteString)
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.outline)
             #endif
@@ -226,7 +226,7 @@ struct SignInView: View {
             if !resend { code = "" }
             focus = .code
         } catch {
-            failure = (error as? AuthError)?.errorDescription ?? AuthError.sendFailed.errorDescription
+            failure = (error as? AuthError)?.message ?? AuthError.unexpected.message
         }
     }
 
@@ -235,9 +235,10 @@ struct SignInView: View {
         busy = true
         defer { busy = false }
         do {
-            session.signIn(try await auth.verify(challenge, code: code))
+            let result = try await auth.verify(challenge, code: code)
+            session.signIn(token: result.token, account: result.account)
         } catch {
-            failure = (error as? AuthError)?.errorDescription ?? AuthError.badCode.errorDescription
+            failure = (error as? AuthError)?.message ?? AuthError.unexpected.message
             code = ""
         }
     }

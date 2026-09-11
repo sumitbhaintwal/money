@@ -44,8 +44,10 @@ struct SettingsView: View {
         .background(Theme.sheet)
         .confirmationDialog("Sign out?", isPresented: $confirmingSignOut, titleVisibility: .visible) {
             Button("Sign out", role: .destructive) {
-                session.signOut()
-                dismiss()
+                Task {
+                    await session.signOut()
+                    dismiss()
+                }
             }
             Button("Cancel", role: .cancel) {}
         } message: {

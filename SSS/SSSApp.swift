@@ -21,6 +21,9 @@ struct SSSApp: App {
         WindowGroup {
             RootView()
                 .environment(session)
+                // A token revoked elsewhere would otherwise leave the app
+                // looking signed in until something happened to fail.
+                .task { await session.refresh() }
                 .tint(Theme.lit)
                 .preferredColorScheme(.light)
         }
