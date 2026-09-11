@@ -1,15 +1,14 @@
 # Money
 
-An ultra-simple iOS expense tracker, bill splitter and money-habit streak. India first.
+An ultra-simple iOS expense tracker and bill splitter. India first.
 
 ## The idea
 
-Spending is the habit being tracked. The month grid is both the expense view and the
-streak: a black dot is a clean day, a grey dot grows with what you spent, so one glance
-shows the expensive days without a chart.
+The month grid is the app. Each day shows what it cost you, coloured by weight, so one
+glance finds the expensive days without a chart.
 
-Essentials never break a streak. Without that exemption the metric rewards skipping a
-meal or a prescription, which is the one way a no-spend streak can do real harm.
+Expenses can be marked essential — groceries, health, transport, bills — which separates
+money you decided to spend from money you didn't.
 
 ## Deliberate constraints
 

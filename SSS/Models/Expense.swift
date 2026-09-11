@@ -7,9 +7,8 @@ final class Expense {
     var note: String
     var spentAt: Date
 
-    /// Essentials never break a streak. Groceries, health, transport, bills —
-    /// without this the metric rewards skipping a meal, which is the one way
-    /// a no-spend streak can do real harm.
+    /// Groceries, health, transport, bills — money that was never really a
+    /// choice. Separates spending you decided on from spending you didn't.
     var isEssential: Bool
 
     /// nil means I paid. Otherwise the person who fronted it.

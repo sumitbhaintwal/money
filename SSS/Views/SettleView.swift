@@ -192,7 +192,7 @@ struct SettleView: View {
         case .confirm:
             return "Nothing is marked paid until you say so. A ledger that guesses is worse than one that asks."
         case .done:
-            return "Clearing a debt is not new spending, so your streak is untouched."
+            return "Recorded on this phone. Nothing was sent anywhere."
         }
     }
 

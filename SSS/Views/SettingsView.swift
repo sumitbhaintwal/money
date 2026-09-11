@@ -27,7 +27,7 @@ struct SettingsView: View {
             }
             .buttonStyle(.glass)
 
-            Text("Signing out only forgets the account. Your expenses, people and streak stay on this phone.")
+            Text("Signing out only forgets the account. Your expenses and people stay on this phone.")
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.dim)
                 .fixedSize(horizontal: false, vertical: true)

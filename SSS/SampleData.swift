@@ -71,7 +71,7 @@ enum SampleData {
         add(22_000, "auto",      -5)
         add(40_000, "groceries", -5, essential: true)
 
-        // Days -4 to -1 are clean. Today is all essentials, so the streak holds at 5.
+        // Days -4 to -1 have nothing on them. Today is all essentials.
         add(84_000, "groceries", 0, essential: true)
         add(18_000, "auto",      0, essential: true)
         add(22_000, "medicines", 0, essential: true)

@@ -26,33 +26,13 @@ enum Ledger {
 
     /// A day is clean when nothing discretionary was logged.
     /// An empty day is clean, and so is a day of nothing but essentials.
+    /// Drives the calendar's colouring; nothing counts runs of them any more.
     static func isClean(_ expenses: [Expense]) -> Bool {
         expenses.allSatisfy(\.isEssential)
     }
 
     static func byDay(_ expenses: [Expense], calendar cal: Calendar = calendar) -> [Date: [Expense]] {
         Dictionary(grouping: expenses) { cal.startOfDay(for: $0.spentAt) }
-    }
-
-    /// The run of clean days ending today. Breaks on the first day with
-    /// discretionary spending; days before the first expense don't count.
-    static func currentStreak(
-        expenses: [Expense],
-        asOf today: Date = .now,
-        calendar cal: Calendar = calendar
-    ) -> Int {
-        let days = byDay(expenses, calendar: cal)
-        guard let earliest = expenses.map({ cal.startOfDay(for: $0.spentAt) }).min() else { return 0 }
-
-        var streak = 0
-        var cursor = cal.startOfDay(for: today)
-        while cursor >= earliest {
-            guard isClean(days[cursor] ?? []) else { break }
-            streak += 1
-            guard let previous = cal.date(byAdding: .day, value: -1, to: cursor) else { break }
-            cursor = previous
-        }
-        return streak
     }
 
     static func monthGrid(
@@ -103,32 +83,6 @@ enum Ledger {
             cells.append(DayCell(id: cells.count, date: nil, dayNumber: nil, state: .blank))
         }
         return cells
-    }
-
-    /// The longest run of clean days on record.
-    static func longestStreak(
-        expenses: [Expense],
-        asOf today: Date = .now,
-        calendar cal: Calendar = calendar
-    ) -> Int {
-        let days = byDay(expenses, calendar: cal)
-        guard let earliest = expenses.map({ cal.startOfDay(for: $0.spentAt) }).min() else { return 0 }
-
-        var best = 0
-        var run = 0
-        var cursor = earliest
-        let end = cal.startOfDay(for: today)
-        while cursor <= end {
-            if isClean(days[cursor] ?? []) {
-                run += 1
-                best = max(best, run)
-            } else {
-                run = 0
-            }
-            guard let next = cal.date(byAdding: .day, value: 1, to: cursor) else { break }
-            cursor = next
-        }
-        return best
     }
 
     /// What I have actually spent this month — my share of every split, not the bills I fronted.

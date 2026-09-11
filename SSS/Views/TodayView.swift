@@ -52,10 +52,13 @@ struct TodayView: View {
     private var header: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(Ledger.currentStreak(expenses: expenses))")
-                    .font(Theme.F.display(68, .bold))
-                    .foregroundStyle(Theme.lit)
-                Label9("DAY STREAK · BEST \(Ledger.longestStreak(expenses: expenses))", size: 14)
+                Text(Money.rupees(Ledger.monthSpendPaise(containing: visibleMonth, expenses: expenses)))
+                    .font(Theme.F.display(52, .bold))
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                Label9(monthSpendLabel, size: 14)
             }
             Spacer()
             HStack(spacing: 10) {
@@ -103,10 +106,6 @@ struct TodayView: View {
             Label9(monthName.uppercased(), color: Theme.ink, size: 19)
             stepper(1, "chevron.right", enabled: canGoForward)
             Spacer()
-            Text(monthSpendLabel)
-                .font(.system(size: 12))
-                .monospacedDigit()
-                .foregroundStyle(Theme.muted)
         }
     }
 
@@ -155,9 +154,8 @@ struct TodayView: View {
     }
 
     private var monthSpendLabel: String {
-        let total = Money.rupees(Ledger.monthSpendPaise(containing: visibleMonth, expenses: expenses))
         let isThisMonth = cal.isDate(visibleMonth, equalTo: today, toGranularity: .month)
-        return isThisMonth ? "\(total) so far" : "\(total) in total"
+        return isThisMonth ? "SO FAR THIS MONTH" : "SPENT IN \(monthName.uppercased())"
     }
 
 }

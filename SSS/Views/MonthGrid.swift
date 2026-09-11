@@ -42,9 +42,9 @@ struct MonthGrid: View {
         let isToday = cell.date.map { Ledger.calendar.isDateInToday($0) } ?? false
 
         VStack(spacing: 2) {
-            // Clean days are the streak, so they stay black and bold even when
-            // essentials were bought — the amount and the streak are separate
-            // facts about a day, and only one of them is the number.
+            // A day with no discretionary spending stays bold, even when
+            // essentials were bought — what went out and whether any of it was
+            // a choice are two different facts about a day.
             Text(amountText(cell.state))
                 // 14, not 16: "0.38k" is five glyphs and at 16pt it filled the whole
                 // 46pt column, so neighbouring days ran together.

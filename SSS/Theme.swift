@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// One greyscale ramp, no hue. Black is the only "lit" value and it is
-/// deliberately scarce: streak, clean days, primary actions, selected state.
+/// deliberately scarce: clean days, primary actions, selected state.
 enum Theme {
     static let ground      = Color(hex: 0xFFFFFF)   // root screens
     static let sheet       = Color(hex: 0xF4F4F4)   // modals, lifted off the root

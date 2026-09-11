@@ -14,7 +14,7 @@ struct WelcomeView: View {
                 .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text("Log what you spend, split what you share, and keep the run of clean days going.")
+            Text("Log what you spend, split what you share, and see where the month actually went.")
                 .font(Theme.F.display(19, .medium))
                 .foregroundStyle(Theme.secondary)
                 .fixedSize(horizontal: false, vertical: true)
