@@ -8,7 +8,7 @@ struct TodayView: View {
     @Query(sort: \Expense.spentAt, order: .reverse) private var expenses: [Expense]
     @State private var selectedDay: Date = Ledger.calendar.startOfDay(for: .now)
     @State private var visibleMonth: Date = Ledger.calendar.startOfDay(for: .now)
-    @State private var editingExpense: Expense?
+    @State private var showingDay = false
 
     private let cal = Ledger.calendar
     private var today: Date { cal.startOfDay(for: .now) }
@@ -23,28 +23,18 @@ struct TodayView: View {
                 .padding(.horizontal, 24)
                 .padding(.top, 40)
 
-            DotGrid(cells: cells, selected: selectedDay) { selectedDay = $0 }
+            DotGrid(cells: cells, selected: selectedDay) { day in
+                selectedDay = day
+                showingDay = true
+            }
                 .padding(.horizontal, 24)
                 .padding(.top, 22)
 
-            selectedHeader
-                .padding(.horizontal, 24)
-                .padding(.top, 30)
-
-            ScrollView {
-                entries
-                    .padding(.horizontal, 24)
-                    // so the last row can clear the floating accessory
-                    .padding(.bottom, 16)
-            }
-            .scrollIndicators(.hidden)
-            .scrollBounceBehavior(.basedOnSize)
-            .scrollEdgeEffectStyle(.soft, for: .bottom)
-            .frame(maxHeight: .infinity, alignment: .top)
+            Spacer(minLength: 0)
         }
         .background(Theme.ground)
-        .sheet(item: $editingExpense) { expense in
-            AddExpenseView(editing: expense)
+        .sheet(isPresented: $showingDay) {
+            DayDrawerView(date: selectedDay)
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.sheet)
         }
@@ -128,93 +118,10 @@ struct TodayView: View {
         }
     }
 
-    private var selectedHeader: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Label9(selectedLabel, size: 14)
-            Spacer()
-            Text(selectedTotalText)
-                .font(.system(size: 21, weight: .medium))
-                .monospacedDigit()
-                .foregroundStyle(selectedIsClean ? Theme.lit : Theme.ink)
-        }
-        .padding(.bottom, 12)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(Theme.rule).frame(height: 1)
-        }
-    }
-
-    @ViewBuilder
-    private var entries: some View {
-        if selectedExpenses.isEmpty {
-            Text(emptyDayText)
-                .font(Theme.F.display(18, .medium))
-                .foregroundStyle(Theme.dim)
-                .frame(height: 50, alignment: .leading)
-        } else {
-            ForEach(selectedExpenses) { expense in
-                HStack(spacing: 9) {
-                    Text(expense.note.isEmpty ? "—" : expense.note)
-                        .font(Theme.F.display(18, .medium))
-                        .foregroundStyle(expense.note.isEmpty ? Theme.dim : Theme.body)
-                    if let tag = tag(for: expense) {
-                        Text(tag)
-                            .font(Theme.F.display(11, .semibold))
-                            .tracking(1.1)
-                            .foregroundStyle(Theme.muted)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .overlay(Rectangle().stroke(Theme.outline, lineWidth: 1))
-                    }
-                    Spacer()
-                    Text(Money.rupees(expense.mySharePaise))
-                        .font(.system(size: 14))
-                        .monospacedDigit()
-                        .foregroundStyle(Theme.secondary)
-                }
-                .frame(height: 50)
-                .overlay(alignment: .bottom) {
-                    Rectangle().fill(Theme.rowRule).frame(height: 1)
-                }
-                .contentShape(Rectangle())
-                .onTapGesture { editingExpense = expense }
-                .contextMenu {
-                    Button("Delete", systemImage: "trash", role: .destructive) {
-                        delete(expense)
-                    }
-                }
-            }
-        }
-    }
-
     // MARK: - Derived
 
     private var cells: [DayCell] {
         Ledger.monthGrid(containing: visibleMonth, expenses: expenses)
-    }
-
-    private var selectedExpenses: [Expense] {
-        expenses.filter { cal.isDate($0.spentAt, inSameDayAs: selectedDay) }
-    }
-
-    /// Days before the first expense are unknown, not virtuous — the grid
-    /// already draws them faint, so the panel must not call them clean.
-    private var selectedIsUnrecorded: Bool {
-        guard let first = expenses.map({ cal.startOfDay(for: $0.spentAt) }).min() else { return true }
-        return selectedDay < first
-    }
-
-    private var selectedIsClean: Bool {
-        selectedDay <= today && !selectedIsUnrecorded && Ledger.isClean(selectedExpenses)
-    }
-
-    private var selectedTotalText: String {
-        if selectedDay > today || selectedIsUnrecorded { return "—" }
-        return Money.rupees(selectedExpenses.reduce(0) { $0 + $1.mySharePaise })
-    }
-
-    private var emptyDayText: String {
-        if selectedDay > today { return "not yet" }
-        return selectedIsUnrecorded ? "nothing recorded" : "clean day"
     }
 
     private var monthName: String {
@@ -231,22 +138,4 @@ struct TodayView: View {
         return isThisMonth ? "\(total) so far" : "\(total) in total"
     }
 
-    private var selectedLabel: String {
-        let f = DateFormatter()
-        f.calendar = cal
-        f.dateFormat = "MMM d"
-        let base = f.string(from: selectedDay).uppercased()
-        return cal.isDateInToday(selectedDay) ? "\(base) · TODAY" : base
-    }
-
-    private func delete(_ expense: Expense) {
-        context.delete(expense)
-        try? context.save()
-    }
-
-    private func tag(for expense: Expense) -> String? {
-        if expense.isSplit { return "SPLIT \(expense.shares.count)" }
-        if expense.isEssential { return "ESSENTIAL" }
-        return nil
-    }
 }
