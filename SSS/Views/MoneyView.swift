@@ -7,7 +7,10 @@ struct MoneyView: View {
 
     @State private var query = ExpenseQuery()
     @State private var editing: Expense?
-    @FocusState private var searchFocused: Bool
+    @State private var showingFilters = false
+    // Opens tall so every group is reachable; drag down to medium to watch the
+    // list update behind it, since the filters apply live.
+    @State private var filterDetent: PresentationDetent = .large
 
     private var results: [Expense] { ExpenseFinder.run(expenses, query) }
     private var total: Int { ExpenseFinder.totalPaise(results) }
@@ -15,14 +18,7 @@ struct MoneyView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header.padding(.horizontal, 24).padding(.top, 8)
-            search.padding(.horizontal, 24).padding(.top, 18)
-            chipRow(ExpenseQuery.Period.allCases, selected: query.period) { query.period = $0 }
-                .padding(.top, 16)
-            chipRow(ExpenseQuery.Kind.allCases, selected: query.kind) { query.kind = $0 }
-                .padding(.top, 8)
-            if !people.isEmpty { personRow.padding(.top, 8) }
-
-            summary.padding(.horizontal, 24).padding(.top, 22)
+            summary.padding(.horizontal, 24).padding(.top, 20)
 
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
@@ -35,9 +31,14 @@ struct MoneyView: View {
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
-            .scrollDismissesKeyboard(.immediately)
         }
         .background(Theme.ground)
+        .sheet(isPresented: $showingFilters) {
+            FilterDrawer(query: $query, people: people)
+                .presentationDetents([.medium, .large], selection: $filterDetent)
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.sheet)
+        }
         .sheet(item: $editing) { expense in
             AddExpenseView(editing: expense)
                 .presentationDragIndicator(.visible)
@@ -51,105 +52,63 @@ struct MoneyView: View {
         HStack {
             Label9("MONEY", size: 14)
             Spacer()
-            Menu {
-                Picker("Sort", selection: $query.sort) {
-                    ForEach(ExpenseQuery.Sort.allCases) { Text($0.label).tag($0) }
+            Button { showingFilters = true } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "line.3.horizontal.decrease")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                    Label9("FILTER", color: Theme.ink, size: 13)
+                    if query.narrowingCount > 0 {
+                        Text("\(query.narrowingCount)")
+                            .font(.system(size: 11, weight: .bold))
+                            .monospacedDigit()
+                            .foregroundStyle(Theme.onLit)
+                            .frame(width: 18, height: 18)
+                            .background(Theme.lit, in: .circle)
+                    }
                 }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.up.arrow.down").font(.system(size: 12, weight: .semibold))
-                    Label9(sortShort, color: Theme.ink, size: 12)
-                }
-                .frame(height: 44)
-                .contentShape(Rectangle())
+                .padding(.horizontal, 14)
+                .frame(height: 40)
+                .glassEffect(.regular.interactive(), in: .capsule)
             }
-            .accessibilityLabel("Sort order")
+            .buttonStyle(.plain)
+            .accessibilityLabel("Filters")
         }
         .frame(height: 44)
     }
 
-    private var sortShort: String {
-        switch query.sort {
-        case .newest:   return "NEWEST"
-        case .oldest:   return "OLDEST"
-        case .largest:  return "LARGEST"
-        case .smallest: return "SMALLEST"
-        }
-    }
-
-    private var search: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Theme.dim)
-            TextField("search notes", text: $query.search)
-                .font(Theme.F.display(18, .medium))
-                .foregroundStyle(Theme.body)
-                .focused($searchFocused)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
-                .submitLabel(.search)
-            if !query.search.isEmpty {
-                Button { query.search = "" } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Theme.outline)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Clear search")
-            }
-        }
-        .frame(height: 46)
-        .padding(.horizontal, 14)
-        .glassEffect(.regular, in: .rect(cornerRadius: 12))
-    }
-
-    /// One scrolling row of glass chips per filter dimension.
-    private func chipRow<T: LabelledOption>(
-        _ options: [T],
-        selected: T,
-        choose: @escaping (T) -> Void
-    ) -> some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 8) {
-                ForEach(options) { option in
-                    Chip(title: option.label, isOn: option == selected) { choose(option) }
-                }
-            }
-            .padding(.horizontal, 24)
-        }
-        .scrollIndicators(.hidden)
-    }
-
-    private var personRow: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 8) {
-                Chip(title: "ANYONE", isOn: query.person == nil) { query.person = nil }
-                ForEach(people) { person in
-                    Chip(
-                        title: person.name.uppercased(),
-                        isOn: query.person == person.persistentModelID
-                    ) {
-                        query.person = query.person == person.persistentModelID ? nil : person.persistentModelID
-                    }
-                }
-            }
-            .padding(.horizontal, 24)
-        }
-        .scrollIndicators(.hidden)
-    }
-
     private var summary: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Label9(results.count == 1 ? "1 EXPENSE" : "\(results.count) EXPENSES", size: 13)
-            Spacer()
-            Text(Money.rupees(total))
-                .font(.system(size: 21, weight: .medium))
-                .monospacedDigit()
-                .foregroundStyle(Theme.ink)
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .firstTextBaseline) {
+                Label9(results.count == 1 ? "1 EXPENSE" : "\(results.count) EXPENSES", size: 13)
+                Spacer()
+                Text(Money.rupees(total))
+                    .font(.system(size: 21, weight: .medium))
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.ink)
+            }
+            // A filtered list that looks like the whole list is a trap, so the
+            // active filters stay on screen even though the controls do not.
+            Text(activeSummary)
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.dim)
+                .lineLimit(1)
+                .truncationMode(.tail)
         }
         .padding(.bottom, 12)
         .overlay(alignment: .bottom) { Rectangle().fill(Theme.rule).frame(height: 1) }
+    }
+
+    private var activeSummary: String {
+        var parts = [query.period.label]
+        if query.kind != .all { parts.append(query.kind.label) }
+        if let id = query.person, let person = people.first(where: { $0.persistentModelID == id }) {
+            parts.append(person.name.uppercased())
+        }
+        let needle = query.search.trimmingCharacters(in: .whitespaces)
+        if !needle.isEmpty { parts.append("“\(needle)”") }
+        if query.sort != .newest { parts.append(query.sort.label) }
+        return parts.joined(separator: " · ")
     }
 
     // MARK: - List
@@ -214,10 +173,3 @@ struct MoneyView: View {
         return f.string(from: date).uppercased()
     }
 }
-
-/// Lets the chip rows render any of the filter enums.
-protocol LabelledOption: Hashable, Identifiable {
-    var label: String { get }
-}
-extension ExpenseQuery.Period: LabelledOption {}
-extension ExpenseQuery.Kind: LabelledOption {}

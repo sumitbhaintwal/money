@@ -37,10 +37,10 @@ struct ExpenseQuery: Equatable {
         var id: String { rawValue }
         var label: String {
             switch self {
-            case .newest:   return "Newest first"
-            case .oldest:   return "Oldest first"
-            case .largest:  return "Largest first"
-            case .smallest: return "Smallest first"
+            case .newest:   return "NEWEST"
+            case .oldest:   return "OLDEST"
+            case .largest:  return "LARGEST"
+            case .smallest: return "SMALLEST"
             }
         }
     }
@@ -51,7 +51,8 @@ struct ExpenseQuery: Equatable {
     var person: PersistentIdentifier?
     var sort: Sort = .newest
 
-    /// Everything except the period, which has its own row of chips.
+    /// How many filters are narrowing the list, for the badge on the Filter
+    /// button. Period and sort are always set, so neither counts.
     var narrowingCount: Int {
         var n = 0
         if !search.trimmingCharacters(in: .whitespaces).isEmpty { n += 1 }
@@ -139,3 +140,12 @@ enum ExpenseFinder {
         }
     }
 }
+
+/// Lets one chip builder render any of the filter enums.
+protocol LabelledOption: Hashable, Identifiable {
+    var label: String { get }
+}
+
+extension ExpenseQuery.Period: LabelledOption {}
+extension ExpenseQuery.Kind: LabelledOption {}
+extension ExpenseQuery.Sort: LabelledOption {}
