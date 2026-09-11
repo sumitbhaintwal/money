@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-enum AppTab: Hashable { case today, people }
+enum AppTab: Hashable { case today, money, people }
 
 struct RootView: View {
     @State private var tab: AppTab = .today
@@ -11,6 +11,9 @@ struct RootView: View {
         TabView(selection: $tab) {
             Tab("Today", systemImage: "circle.grid.3x3.fill", value: AppTab.today) {
                 TodayView(showPeople: { tab = .people })
+            }
+            Tab("Money", systemImage: "indianrupeesign", value: AppTab.money) {
+                MoneyView()
             }
             Tab("People", systemImage: "person.2.fill", value: AppTab.people) {
                 PeopleView()
