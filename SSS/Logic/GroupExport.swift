@@ -17,15 +17,13 @@ enum GroupExport {
         lines.append(subtitle(group))
         lines.append("")
 
-        let balances = Groups.balances(in: group)
+        let balances = Groups.settlement(in: group)
         if balances.isEmpty {
             lines.append("Everyone is settled up.")
         } else {
             lines.append("WHO OWES WHAT")
             for balance in balances {
-                lines.append(balance.theyOweMe
-                    ? "\(balance.person.name) owes you \(Money.rupees(balance.paise))"
-                    : "You owe \(balance.person.name) \(Money.rupees(-balance.paise))")
+                lines.append(standing(balance))
             }
         }
 
@@ -40,6 +38,16 @@ enum GroupExport {
         }
 
         return lines.joined(separator: "\n")
+    }
+
+    /// Written for whoever is reading it in the group chat, so it names both
+    /// sides rather than assuming the reader is me.
+    private static func standing(_ balance: GroupBalance) -> String {
+        let amount = Money.rupees(abs(balance.paise))
+        if balance.isMine {
+            return balance.isOwed ? "You are owed \(amount)" : "You owe \(amount)"
+        }
+        return balance.isOwed ? "\(balance.name) is owed \(amount)" : "\(balance.name) owes \(amount)"
     }
 
     private static func subtitle(_ group: ExpenseGroup) -> String {
@@ -102,10 +110,10 @@ enum GroupExport {
         rows.append([])
         rows.append(["", "Total", String(Groups.totalPaise(group) / 100), "", "", "", ""])
         rows.append(["", "Your share", String(Groups.mySharePaise(group) / 100), "", "", "", ""])
-        for balance in Groups.balances(in: group) {
+        for balance in Groups.settlement(in: group) {
             rows.append([
                 "",
-                balance.theyOweMe ? "\(balance.person.name) owes you" : "You owe \(balance.person.name)",
+                balance.isOwed ? "\(balance.name) is owed" : "\(balance.name) owes",
                 String(abs(balance.paise) / 100),
                 "", "", "", "",
             ])

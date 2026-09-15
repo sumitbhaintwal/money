@@ -11,7 +11,7 @@ struct GroupDetailView: View {
     private var expenses: [Expense] {
         group.expenses.sorted { $0.spentAt > $1.spentAt }
     }
-    private var balances: [PersonBalance] { Groups.balances(in: group) }
+    private var balances: [GroupBalance] { Groups.settlement(in: group) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -119,21 +119,30 @@ struct GroupDetailView: View {
         .overlay(alignment: .bottom) { Rectangle().fill(Theme.rule).frame(height: 1) }
     }
 
-    private func balanceRow(_ balance: PersonBalance) -> some View {
+    private func balanceRow(_ balance: GroupBalance) -> some View {
         HStack(spacing: 12) {
-            Text(balance.person.name)
+            Text(balance.name)
                 .font(Theme.F.display(20, .medium))
                 .foregroundStyle(Theme.body)
             Spacer()
-            Text(balance.theyOweMe
-                 ? "owes you \(Money.rupees(balance.paise))"
-                 : "you owe \(Money.rupees(-balance.paise))")
+            Text(standing(balance))
                 .font(.system(size: 13))
                 .monospacedDigit()
-                .foregroundStyle(balance.theyOweMe ? Theme.ink : Theme.secondary)
+                .foregroundStyle(balance.isOwed ? Theme.ink : Theme.secondary)
         }
         .frame(height: 52)
         .overlay(alignment: .bottom) { Rectangle().fill(Theme.rowRule).frame(height: 1) }
+    }
+
+    /// A trip settles between everyone on it, not just between me and each of
+    /// them, so a row has to say which way the money goes without a "you" on
+    /// both sides of it.
+    private func standing(_ balance: GroupBalance) -> String {
+        let amount = Money.rupees(abs(balance.paise))
+        if balance.isMine {
+            return balance.isOwed ? "you're owed \(amount)" : "you owe \(amount)"
+        }
+        return balance.isOwed ? "is owed \(amount)" : "owes \(amount)"
     }
 
     private func expenseRow(_ expense: Expense) -> some View {
