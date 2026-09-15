@@ -6,6 +6,7 @@ import SwiftData
 struct FilterDrawer: View {
     @Binding var query: ExpenseQuery
     let people: [Person]
+    let groups: [ExpenseGroup]
 
     @Environment(\.dismiss) private var dismiss
     @FocusState private var searchFocused: Bool
@@ -25,6 +26,9 @@ struct FilterDrawer: View {
                     }
                     if !people.isEmpty {
                         group("PERSON") { personChips }
+                    }
+                    if !groups.isEmpty {
+                        group("GROUP") { groupChips }
                     }
                     group("SORT BY") {
                         chips(ExpenseQuery.Sort.allCases, selected: query.sort) { query.sort = $0 }
@@ -107,6 +111,20 @@ struct FilterDrawer: View {
         FlowLayout(spacing: 8) {
             ForEach(options) { option in
                 Chip(title: option.label, isOn: option == selected) { choose(option) }
+            }
+        }
+    }
+
+    private var groupChips: some View {
+        FlowLayout(spacing: 8) {
+            Chip(title: "ANY", isOn: query.group == nil) { query.group = nil }
+            ForEach(groups) { item in
+                Chip(
+                    title: item.name.uppercased(),
+                    isOn: query.group == item.persistentModelID
+                ) {
+                    query.group = query.group == item.persistentModelID ? nil : item.persistentModelID
+                }
             }
         }
     }

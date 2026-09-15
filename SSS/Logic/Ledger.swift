@@ -25,10 +25,11 @@ enum Ledger {
     }
 
     /// A day is clean when nothing discretionary was logged.
-    /// An empty day is clean, and so is a day of nothing but essentials.
+    /// An empty day is clean, and so is a day of nothing but essentials — or of
+    /// bills paid entirely for other people, which cost me nothing.
     /// Drives the calendar's colouring; nothing counts runs of them any more.
     static func isClean(_ expenses: [Expense]) -> Bool {
-        expenses.allSatisfy(\.isEssential)
+        expenses.allSatisfy { $0.isEssential || $0.excludesMe }
     }
 
     static func byDay(_ expenses: [Expense], calendar cal: Calendar = calendar) -> [Date: [Expense]] {

@@ -3,7 +3,9 @@ import SwiftData
 
 struct MoneyView: View {
     @Query(sort: \Expense.spentAt, order: .reverse) private var expenses: [Expense]
-    @Query(sort: \Person.name) private var people: [Person]
+    @Query(filter: #Predicate<Person> { $0.removedAt == nil }, sort: \Person.name)
+    private var people: [Person]
+    @Query private var allGroups: [ExpenseGroup]
 
     @State private var query = ExpenseQuery()
     @State private var editing: Expense?
@@ -34,7 +36,7 @@ struct MoneyView: View {
         }
         .background(Theme.ground)
         .sheet(isPresented: $showingFilters) {
-            FilterDrawer(query: $query, people: people)
+            FilterDrawer(query: $query, people: people, groups: Groups.sorted(allGroups))
                 .presentationDetents([.medium, .large], selection: $filterDetent)
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.sheet)
@@ -105,6 +107,9 @@ struct MoneyView: View {
         if let id = query.person, let person = people.first(where: { $0.persistentModelID == id }) {
             parts.append(person.name.uppercased())
         }
+        if let id = query.group, let item = allGroups.first(where: { $0.persistentModelID == id }) {
+            parts.append(item.name.uppercased())
+        }
         let needle = query.search.trimmingCharacters(in: .whitespaces)
         if !needle.isEmpty { parts.append("“\(needle)”") }
         if query.sort != .newest { parts.append(query.sort.label) }
@@ -135,8 +140,8 @@ struct MoneyView: View {
                         if expense.isEssential { tag("ESSENTIAL") }
                         if ExpenseFinder.hasOpenMoney(expense) { tag("OPEN") }
                     }
-                    if expense.isSplit {
-                        Text("my share of \(Money.rupees(expense.amountPaise)), split \(expense.shares.count)")
+                    if let detail = splitDetail(expense) {
+                        Text(detail)
                             .font(.system(size: 11))
                             .foregroundStyle(Theme.dim)
                     }
@@ -154,6 +159,15 @@ struct MoneyView: View {
             .overlay(alignment: .bottom) { Rectangle().fill(Theme.rowRule).frame(height: 1) }
         }
         .buttonStyle(.plain)
+    }
+
+    /// Why the number on the right is smaller than the bill that was paid.
+    private func splitDetail(_ expense: Expense) -> String? {
+        guard expense.isSplit else { return nil }
+        if expense.excludesMe {
+            return "\(Money.rupees(expense.amountPaise)) covered for \(expense.splitWays), none of it mine"
+        }
+        return "my share of \(Money.rupees(expense.amountPaise)), split \(expense.splitWays)"
     }
 
     private func tag(_ text: String) -> some View {

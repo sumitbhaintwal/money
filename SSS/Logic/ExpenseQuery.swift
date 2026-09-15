@@ -49,6 +49,7 @@ struct ExpenseQuery: Equatable {
     var period: Period = .thisMonth
     var kind: Kind = .all
     var person: PersistentIdentifier?
+    var group: PersistentIdentifier?
     var sort: Sort = .newest
 
     /// How many filters are narrowing the list, for the badge on the Filter
@@ -58,6 +59,7 @@ struct ExpenseQuery: Equatable {
         if !search.trimmingCharacters(in: .whitespaces).isEmpty { n += 1 }
         if kind != .all { n += 1 }
         if person != nil { n += 1 }
+        if group != nil { n += 1 }
         return n
     }
 }
@@ -88,6 +90,10 @@ enum ExpenseFinder {
         case .discretionary: results = results.filter { !$0.isEssential }
         case .split:         results = results.filter(\.isSplit)
         case .unsettled:     results = results.filter(hasOpenMoney)
+        }
+
+        if let group = query.group {
+            results = results.filter { $0.group?.persistentModelID == group }
         }
 
         if let person = query.person {

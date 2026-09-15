@@ -138,7 +138,8 @@ struct DayDrawerView: View {
     }
 
     private func tag(for expense: Expense) -> String? {
-        if expense.isSplit { return "SPLIT \(expense.shares.count)" }
+        if expense.excludesMe { return "COVERED" }
+        if expense.isSplit { return "SPLIT \(expense.splitWays)" }
         if expense.isEssential { return "ESSENTIAL" }
         return nil
     }

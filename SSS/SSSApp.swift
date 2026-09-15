@@ -8,7 +8,7 @@ struct SSSApp: App {
 
     init() {
         do {
-            container = try ModelContainer(for: Expense.self, Person.self, Share.self)
+            container = try ModelContainer(for: Expense.self, Person.self, Share.self, ExpenseGroup.self)
         } catch {
             fatalError("Could not open the local store: \(error)")
         }

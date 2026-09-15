@@ -3,7 +3,8 @@ import SwiftData
 
 struct PeopleManagerView: View {
     @Environment(\.dismiss) private var dismiss
-    @Query(sort: \Person.name) private var people: [Person]
+    @Query(filter: #Predicate<Person> { $0.removedAt == nil }, sort: \Person.name)
+    private var people: [Person]
     @Query private var expenses: [Expense]
 
     @State private var editingPerson: Person?
@@ -117,6 +118,7 @@ struct PersonEditorView: View {
 
     @State private var name: String
     @State private var upi: String
+    @State private var confirmingRemoval = false
 
     init(person: Person?) {
         self.person = person
@@ -128,11 +130,27 @@ struct PersonEditorView: View {
 
     private var isUsed: Bool {
         guard let person else { return false }
-        let id = person.persistentModelID
-        return expenses.contains { expense in
-            expense.payer?.persistentModelID == id
-                || expense.shares.contains { $0.person?.persistentModelID == id }
+        return Balances.appearsAnywhere(person, in: expenses)
+    }
+
+    /// What removing them would write off, if anything.
+    private var openBalancePaise: Int {
+        guard let person else { return 0 }
+        return Balances.all(in: expenses)
+            .first { $0.person.persistentModelID == person.persistentModelID }?.paise ?? 0
+    }
+
+    private var removalWarning: String {
+        let owed = openBalancePaise
+        if owed > 0 {
+            return "\(person?.name ?? "They") owe you \(Money.rupees(owed)). Removing them writes that off."
         }
+        if owed < 0 {
+            return "You owe \(person?.name ?? "them") \(Money.rupees(-owed)). Removing them writes that off."
+        }
+        return isUsed
+            ? "Past expenses keep their amounts and totals do not change — their name just stops appearing."
+            : "They have never been in a split, so nothing is left behind."
     }
 
     var body: some View {
@@ -154,20 +172,12 @@ struct PersonEditorView: View {
             Spacer(minLength: 0)
 
             if person != nil {
-                if isUsed {
-                    Text("Already part of a split, so they cannot be removed — their share is what makes those expenses add up.")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Theme.dim)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.bottom, 12)
-                } else {
-                    Button(role: .destructive) { delete() } label: {
-                        Text("DELETE").font(Theme.F.display(17, .bold)).tracking(3)
-                            .frame(maxWidth: .infinity, minHeight: 52)
-                    }
-                    .buttonStyle(.glass)
-                    .padding(.bottom, 12)
+                Button(role: .destructive) { confirmingRemoval = true } label: {
+                    Text("REMOVE").font(Theme.F.display(17, .bold)).tracking(3)
+                        .frame(maxWidth: .infinity, minHeight: 52)
                 }
+                .buttonStyle(.glass)
+                .padding(.bottom, 12)
             }
 
             Button { save() } label: {
@@ -185,6 +195,16 @@ struct PersonEditorView: View {
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
         .presentationBackground(Theme.sheet)
+        .confirmationDialog(
+            "Remove \(person?.name ?? "this person")?",
+            isPresented: $confirmingRemoval,
+            titleVisibility: .visible
+        ) {
+            Button("Remove", role: .destructive) { remove() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(removalWarning)
+        }
     }
 
     private func field(_ label: String, text: Binding<String>, placeholder: String, capitalised: Bool) -> some View {
@@ -213,9 +233,9 @@ struct PersonEditorView: View {
         dismiss()
     }
 
-    private func delete() {
-        guard let person, !isUsed else { return }
-        context.delete(person)
+    private func remove() {
+        guard let person else { return }
+        Balances.remove(person, in: expenses, context: context)
         try? context.save()
         dismiss()
     }

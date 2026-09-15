@@ -4,7 +4,9 @@ import SwiftData
 struct AddExpenseView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
-    @Query(sort: \Person.createdAt) private var people: [Person]
+    @Query(filter: #Predicate<Person> { $0.removedAt == nil }, sort: \Person.createdAt)
+    private var people: [Person]
+    @Query private var allGroups: [ExpenseGroup]
 
     private enum Field { case amount, note }
 
@@ -12,7 +14,10 @@ struct AddExpenseView: View {
     @State private var note = ""
     @State private var isEssential = false
     @State private var isSplit = false
+    /// Off when I paid but took none of it — covering someone else's bill.
+    @State private var includesMe = true
     @State private var chosen: Set<PersistentIdentifier> = []
+    @State private var groupID: PersistentIdentifier?
     @State private var addingPerson = false
     @State private var newPersonName = ""
     @FocusState private var focus: Field?
@@ -22,12 +27,14 @@ struct AddExpenseView: View {
 
     init(editing: Expense? = nil) {
         self.editing = editing
-        let split = (editing?.shares.count ?? 0) > 1
+        let shares = editing?.shares ?? []
         _digits = State(initialValue: editing.map { String($0.amountPaise / 100) } ?? "")
         _note = State(initialValue: editing?.note ?? "")
         _isEssential = State(initialValue: editing?.isEssential ?? false)
-        _isSplit = State(initialValue: split)
+        _isSplit = State(initialValue: !shares.isEmpty)
+        _includesMe = State(initialValue: shares.isEmpty || shares.contains { $0.person == nil })
         _chosen = State(initialValue: Set((editing?.shares ?? []).compactMap { $0.person?.persistentModelID }))
+        _groupID = State(initialValue: editing?.group?.persistentModelID)
     }
 
     var body: some View {
@@ -36,11 +43,20 @@ struct AddExpenseView: View {
             amountRow.padding(.top, 34)
             noteField.padding(.horizontal, 24).padding(.top, 32)
             chips.padding(.horizontal, 24).padding(.top, 18)
+            if !selectableGroups.isEmpty { groupChips.padding(.top, 10) }
 
+            // Scrolls rather than grows: six people plus the covering note
+            // overflowed the sheet, clipping the header and pushing the save
+            // button off the bottom edge.
             if isSplit {
-                peoplePane
-                    .padding(.horizontal, 24)
-                    .padding(.top, 26)
+                ScrollView {
+                    peoplePane
+                        .padding(.horizontal, 24)
+                        .padding(.top, 26)
+                        .padding(.bottom, 4)
+                }
+                .scrollIndicators(.hidden)
+                .scrollBounceBehavior(.basedOnSize)
             }
 
             Spacer(minLength: 0)
@@ -131,12 +147,48 @@ struct AddExpenseView: View {
             Chip(title: "SPLIT", isOn: isSplit, systemImage: "divide") {
                 isSplit.toggle()
                 // Drop the keyboard when the people list appears, or it covers it.
-                if isSplit { focus = nil } else { focus = .amount }
+                if isSplit { focus = nil } else { focus = .amount; includesMe = true }
             }
             Chip(title: "ESSENTIAL", isOn: isEssential) {
                 isEssential.toggle()
             }
             Spacer()
+        }
+    }
+
+    /// Open trips, plus whatever this expense is already filed under.
+    private var selectableGroups: [ExpenseGroup] {
+        Groups.sorted(allGroups.filter { $0.isOpen || $0.persistentModelID == groupID })
+    }
+
+    private var groupChips: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 8) {
+                Chip(title: "NO GROUP", isOn: groupID == nil) { groupID = nil }
+                ForEach(selectableGroups) { group in
+                    Chip(title: group.name.uppercased(), isOn: groupID == group.persistentModelID) {
+                        pick(group)
+                    }
+                }
+            }
+            .padding(.horizontal, 24)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    /// Choosing a trip pre-selects the people on it — splitting the same bill
+    /// between the same five people is most of the tedium.
+    private func pick(_ group: ExpenseGroup) {
+        if groupID == group.persistentModelID {
+            groupID = nil
+            return
+        }
+        groupID = group.persistentModelID
+        let members = Set(group.members.map(\.persistentModelID))
+        if !members.isEmpty {
+            chosen = members
+            isSplit = true
+            focus = nil
         }
     }
 
@@ -160,7 +212,15 @@ struct AddExpenseView: View {
                     .foregroundStyle(Theme.dim)
                     .frame(height: 58, alignment: .leading)
             } else {
-                personRow(name: "You", isOn: true, amount: shareText(at: 0), toggle: nil)
+                // Tickable like anyone else — untick it and you paid a bill that
+                // was entirely someone else's. Picking nobody at all just leaves
+                // the button saying PICK SOMEONE, same as before.
+                personRow(
+                    name: "You",
+                    isOn: includesMe,
+                    amount: includesMe ? shareText(at: 0) : "—",
+                    toggle: { includesMe.toggle() }
+                )
                 ForEach(Array(people.enumerated()), id: \.element.persistentModelID) { index, person in
                     personRow(
                         name: person.name,
@@ -169,6 +229,13 @@ struct AddExpenseView: View {
                         toggle: { toggle(person) }
                     )
                 }
+            }
+
+            if !includesMe && !chosen.isEmpty {
+                Text("You're covering this — none of it counts as your spending.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.muted)
+                    .padding(.top, 14)
             }
 
             if let remainder = Split.remainderNote(totalPaise: amountPaise, among: participantCount), hasAmount {
@@ -233,16 +300,21 @@ struct AddExpenseView: View {
 
     /// Split with nobody picked is not a saveable state, and the button should say so.
     private var canSave: Bool {
-        hasAmount && !(isSplit && chosen.isEmpty)
+        hasAmount && !(isSplit && participantCount == 0)
     }
 
     // MARK: - Derived
 
+    private var selectedGroup: ExpenseGroup? {
+        guard let groupID else { return nil }
+        return allGroups.first { $0.persistentModelID == groupID }
+    }
+
     private var amountPaise: Int { (Int(digits) ?? 0) * 100 }
     private var hasAmount: Bool { amountPaise > 0 }
 
-    /// Me, plus everyone ticked.
-    private var participantCount: Int { chosen.count + 1 }
+    /// Everyone ticked, plus me unless I've taken myself off the bill.
+    private var participantCount: Int { chosen.count + (includesMe ? 1 : 0) }
 
     private var shares: [Int] {
         Split.evenly(totalPaise: amountPaise, among: participantCount)
@@ -256,17 +328,20 @@ struct AddExpenseView: View {
     private func shareText(forPersonAt index: Int) -> String {
         let person = people[index]
         guard chosen.contains(person.persistentModelID) else { return "—" }
+        // 1-based position among the ticked people; my own share sits at 0 when
+        // I'm on the bill, so everyone slides down one place.
         let rank = people
             .prefix(index + 1)
             .filter { chosen.contains($0.persistentModelID) }
             .count
-        return shareText(at: rank)
+        return shareText(at: includesMe ? rank : rank - 1)
     }
 
     private var ctaTitle: String {
         guard hasAmount else { return "ENTER AN AMOUNT" }
-        if isSplit && chosen.isEmpty { return "PICK SOMEONE" }
+        if isSplit && participantCount == 0 { return "PICK SOMEONE" }
         if editing != nil { return "SAVE CHANGES" }
+        if isSplit && !includesMe { return "COVER \(Money.rupees(amountPaise))" }
         if isSplit { return "SPLIT \(Money.rupees(amountPaise))" }
         return "SAVE \(Money.rupees(amountPaise))"
     }
@@ -316,23 +391,28 @@ struct AddExpenseView: View {
             expense.amountPaise = amountPaise
             expense.note = trimmed
             expense.isEssential = isEssential
+            expense.group = selectedGroup
         } else {
             expense = Expense(
                 amountPaise: amountPaise,
                 note: trimmed,
                 spentAt: .now,
-                isEssential: isEssential
+                isEssential: isEssential,
+                group: selectedGroup
             )
             context.insert(expense)
         }
 
         if isSplit && !chosen.isEmpty {
             let participants = people.filter { chosen.contains($0.persistentModelID) }
-            let amounts = Split.evenly(totalPaise: amountPaise, among: participants.count + 1)
-            var rows = [Share(amountPaise: amounts[0])]
+            let amounts = Split.evenly(totalPaise: amountPaise, among: participantCount)
+            // My portion leads the list when there is one; leaving it out is what
+            // makes the expense cost me nothing, since mySharePaise reads exactly
+            // the share with no person on it.
+            var rows = includesMe ? [Share(amountPaise: amounts[0])] : []
             for (index, person) in participants.enumerated() {
                 rows.append(Share(
-                    amountPaise: amounts[index + 1],
+                    amountPaise: amounts[index + (includesMe ? 1 : 0)],
                     person: person,
                     settledAt: alreadySettled[person.persistentModelID]
                 ))

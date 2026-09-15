@@ -3,8 +3,13 @@ import SwiftData
 
 struct PeopleView: View {
     @Query(sort: \Expense.spentAt, order: .reverse) private var expenses: [Expense]
+    @Query private var allGroups: [ExpenseGroup]
     @State private var settling: PersonBalance?
     @State private var managing = false
+    @State private var creatingGroup = false
+    @State private var openGroup: ExpenseGroup?
+
+    private var groups: [ExpenseGroup] { Groups.sorted(allGroups) }
 
     private var balances: [PersonBalance] { Balances.all(in: expenses) }
     private var owedToMe: [PersonBalance] { balances.filter(\.theyOweMe) }
@@ -18,12 +23,13 @@ struct PeopleView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    if balances.isEmpty {
+                    if balances.isEmpty && groups.isEmpty {
                         Text("Nobody owes anybody.")
                             .font(Theme.F.display(20, .medium))
                             .foregroundStyle(Theme.dim)
                             .padding(.top, 44)
                     }
+                    groupsSection
                     section("OWED TO YOU", owedToMe, tint: Theme.ink)
                     section("YOU OWE", iOwe, tint: Theme.secondary)
                 }
@@ -42,6 +48,8 @@ struct PeopleView: View {
                 .padding(.bottom, 28)
         }
         .background(Theme.ground)
+        .sheet(isPresented: $creatingGroup) { GroupEditorView(group: nil) }
+        .sheet(item: $openGroup) { GroupDetailView(group: $0) }
         .sheet(isPresented: $managing) {
             PeopleManagerView()
                 .presentationDragIndicator(.visible)
@@ -76,6 +84,66 @@ struct PeopleView: View {
                 .foregroundStyle(Theme.ink)
             Label9(balances.isEmpty ? "ALL SQUARE" : "NET, ACROSS \(balances.count) PEOPLE", size: 14)
         }
+    }
+
+    @ViewBuilder
+    private var groupsSection: some View {
+        HStack {
+            Label9("GROUPS", size: 13)
+            Spacer()
+            Button { creatingGroup = true } label: {
+                Label9("+ NEW", color: Theme.ink, size: 13)
+                    .frame(height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.top, 8)
+
+        if groups.isEmpty {
+            Text("A group keeps a trip or a flat together, and pre-picks who splits it.")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.dim)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, 8)
+        }
+
+        ForEach(groups) { group in
+            Button { openGroup = group } label: {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(group.name)
+                            .font(Theme.F.display(21, .medium))
+                            .foregroundStyle(group.isOpen ? Theme.body : Theme.dim)
+                        Text(groupSubtitle(group))
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.dim)
+                    }
+                    Spacer()
+                    Text(Money.rupees(Groups.totalPaise(group)))
+                        .font(.system(size: 17, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(group.isOpen ? Theme.ink : Theme.dim)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.outline)
+                }
+                .frame(height: 62)
+                .contentShape(Rectangle())
+                .overlay(alignment: .bottom) { Rectangle().fill(Theme.rowRule).frame(height: 1) }
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func groupSubtitle(_ group: ExpenseGroup) -> String {
+        let people = group.members.count == 1 ? "1 person" : "\(group.members.count) people"
+        let net = Groups.netPaise(in: group)
+        let closed = group.isOpen ? "" : "closed · "
+        if net == 0 { return "\(closed)\(people) · settled up" }
+        return net > 0
+            ? "\(closed)\(people) · you're owed \(Money.rupees(net))"
+            : "\(closed)\(people) · you owe \(Money.rupees(-net))"
     }
 
     @ViewBuilder

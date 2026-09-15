@@ -55,9 +55,16 @@ enum Balances {
         }
 
         return running.values
-            .filter { $0.paise != 0 }
+            .filter { $0.paise != 0 && $0.person.isActive }
             .map { PersonBalance(person: $0.person, paise: $0.paise, notes: $0.notes, oldest: $0.oldest) }
-            .sorted { abs($0.paise) > abs($1.paise) }
+            // Name breaks the tie: two people owing the same amount came out of
+            // the dictionary in a different order each time, so the list — and
+            // every export of it — reshuffled itself between renders.
+            .sorted {
+                abs($0.paise) == abs($1.paise)
+                    ? $0.person.name.localizedStandardCompare($1.person.name) == .orderedAscending
+                    : abs($0.paise) > abs($1.paise)
+            }
     }
 
     /// Everything still open between me and one person, in both directions.
@@ -74,6 +81,43 @@ enum Balances {
     static func settle(with person: Person, in expenses: [Expense], on date: Date = .now) {
         for share in openShares(with: person, in: expenses) {
             share.settledAt = date
+        }
+    }
+}
+
+
+extension Balances {
+
+    /// Has this person ever been part of an expense? Determines whether they
+    /// can be deleted outright or only removed.
+    static func appearsAnywhere(_ person: Person, in expenses: [Expense]) -> Bool {
+        let id = person.persistentModelID
+        return expenses.contains { expense in
+            expense.payer?.persistentModelID == id
+                || expense.shares.contains { $0.person?.persistentModelID == id }
+        }
+    }
+
+    /// Removing someone writes off whatever is open between you — there is
+    /// nobody left to chase or to pay.
+    ///
+    /// If they have ever been in a split this is a *soft* removal. Deleting the
+    /// row would nullify Share.person, and a share with no person reads as
+    /// mine, so their portion would quietly become my spending. Their shares
+    /// keep their amounts, so no expense total moves.
+    static func remove(
+        _ person: Person,
+        in expenses: [Expense],
+        context: ModelContext,
+        now: Date = .now
+    ) {
+        settle(with: person, in: expenses, on: now)
+        person.groups.removeAll()
+
+        if appearsAnywhere(person, in: expenses) {
+            person.removedAt = now
+        } else {
+            context.delete(person)
         }
     }
 }
