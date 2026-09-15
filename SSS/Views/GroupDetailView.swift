@@ -86,8 +86,13 @@ struct GroupDetailView: View {
     /// group chat, the CSV to whoever keeps the accounts.
     private var exportMenu: some View {
         Menu {
-            ShareLink(item: GroupExport.summary(group)) {
-                Label("Share summary", systemImage: "text.alignleft")
+            if let document = GroupPDF.render(group) {
+                ShareLink(
+                    item: document,
+                    preview: SharePreview("\(group.name) expenses", image: Image(systemName: "doc.richtext"))
+                ) {
+                    Label("Share PDF", systemImage: "doc.richtext")
+                }
             }
             ShareLink(
                 item: GroupExport.csv(group),

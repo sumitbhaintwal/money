@@ -2,69 +2,10 @@ import Foundation
 import CoreTransferable
 import UniformTypeIdentifiers
 
-/// A trip's books, in two shapes: a plain-text summary you paste into the group
-/// chat, and a CSV for anyone who wants it in a spreadsheet. Nobody else runs
-/// this app, so the export *is* the sharing — it has to read correctly to
-/// someone who has never seen the screen it came from.
+/// A trip's books as a spreadsheet, for whoever keeps the accounts. The other
+/// half of exporting is GroupPDF, which is the shape people actually send each
+/// other. Nobody else runs this app, so the export *is* the sharing.
 enum GroupExport {
-
-    // MARK: - Text
-
-    static func summary(_ group: ExpenseGroup) -> String {
-        var lines: [String] = []
-
-        lines.append(group.name)
-        lines.append(subtitle(group))
-        lines.append("")
-
-        let transfers = Groups.settleUp(in: group)
-        if transfers.isEmpty {
-            lines.append("Everyone is square.")
-        } else {
-            lines.append("SETTLE UP")
-            for transfer in transfers {
-                lines.append("\(transfer.fromName) pays \(transfer.toName) \(Money.rupees(transfer.paise))")
-            }
-        }
-
-        let expenses = ordered(group)
-        if !expenses.isEmpty {
-            lines.append("")
-            lines.append("EXPENSES")
-            for expense in expenses {
-                lines.append(headline(expense))
-                if let split = splitLine(expense) { lines.append("   \(split)") }
-            }
-        }
-
-        return lines.joined(separator: "\n")
-    }
-
-    private static func subtitle(_ group: ExpenseGroup) -> String {
-        var parts = ["\(group.members.count) \(group.members.count == 1 ? "person" : "people")"]
-        parts.append("\(Money.rupees(Groups.totalPaise(group))) total")
-        parts.append("your share \(Money.rupees(Groups.mySharePaise(group)))")
-        if !group.isOpen { parts.append("closed") }
-        return parts.joined(separator: " · ")
-    }
-
-    private static func headline(_ expense: Expense) -> String {
-        let note = expense.note.isEmpty ? "unlabelled" : expense.note
-        let payer = expense.payer.map { "\($0.name) paid" } ?? "you paid"
-        return "\(dayLabel(expense.spentAt)) — \(note) — \(Money.rupees(expense.amountPaise)) (\(payer))"
-    }
-
-    /// "You ₹500 · Ravi ₹500 (paid) · Meera ₹500". Nil when nothing was split,
-    /// so a solo expense on the trip does not get a pointless second line.
-    private static func splitLine(_ expense: Expense) -> String? {
-        guard !expense.shares.isEmpty else { return nil }
-        return shares(of: expense).map { share in
-            let who = share.person?.name ?? "You"
-            let settled = share.settledAt == nil ? "" : " (paid)"
-            return "\(who) \(Money.rupees(share.amountPaise))\(settled)"
-        }
-        .joined(separator: " · ")
-    }
 
     // MARK: - CSV
 
@@ -156,12 +97,6 @@ enum GroupExport {
         }
     }
 
-    private static func dayLabel(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.calendar = Ledger.calendar
-        f.dateFormat = "d MMM"
-        return f.string(from: date)
-    }
 
     private static func isoLabel(_ date: Date) -> String {
         let f = DateFormatter()
