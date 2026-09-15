@@ -11,7 +11,7 @@ struct GroupDetailView: View {
     private var expenses: [Expense] {
         group.expenses.sorted { $0.spentAt > $1.spentAt }
     }
-    private var balances: [GroupBalance] { Groups.settlement(in: group) }
+    private var transfers: [Transfer] { Groups.settleUp(in: group) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -20,9 +20,15 @@ struct GroupDetailView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    if !balances.isEmpty {
-                        Label9("WHO OWES WHAT", size: 11).padding(.top, 26).padding(.bottom, 4)
-                        ForEach(balances) { balanceRow($0) }
+                    if !expenses.isEmpty {
+                        Label9("SETTLE UP", size: 11).padding(.top, 26).padding(.bottom, 4)
+                        if transfers.isEmpty {
+                            Text("Everyone's square.")
+                                .font(Theme.F.display(19, .medium))
+                                .foregroundStyle(Theme.dim)
+                                .frame(height: 52, alignment: .leading)
+                        }
+                        ForEach(transfers) { transferRow($0) }
                     }
 
                     Label9(expenses.isEmpty ? "NOTHING YET" : "EXPENSES", size: 11)
@@ -119,30 +125,30 @@ struct GroupDetailView: View {
         .overlay(alignment: .bottom) { Rectangle().fill(Theme.rule).frame(height: 1) }
     }
 
-    private func balanceRow(_ balance: GroupBalance) -> some View {
-        HStack(spacing: 12) {
-            Text(balance.name)
-                .font(Theme.F.display(20, .medium))
-                .foregroundStyle(Theme.body)
-            Spacer()
-            Text(standing(balance))
-                .font(.system(size: 13))
+    /// One payment per row, in the order it would be made. Rows with me on
+    /// either end are the ones the reader can do something about, so they carry
+    /// the full ink and everyone else's arrangement sits back a shade.
+    private func transferRow(_ transfer: Transfer) -> some View {
+        HStack(spacing: 10) {
+            Text(transfer.fromName)
+                .font(Theme.F.display(19, .medium))
+                .foregroundStyle(transfer.isMine ? Theme.body : Theme.secondary)
+                .lineLimit(1)
+            Image(systemName: "arrow.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Theme.outline)
+            Text(transfer.toName)
+                .font(Theme.F.display(19, .medium))
+                .foregroundStyle(transfer.isMine ? Theme.body : Theme.secondary)
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            Text(Money.rupees(transfer.paise))
+                .font(.system(size: 15, weight: .medium))
                 .monospacedDigit()
-                .foregroundStyle(balance.isOwed ? Theme.ink : Theme.secondary)
+                .foregroundStyle(transfer.isMine ? Theme.ink : Theme.secondary)
         }
         .frame(height: 52)
         .overlay(alignment: .bottom) { Rectangle().fill(Theme.rowRule).frame(height: 1) }
-    }
-
-    /// A trip settles between everyone on it, not just between me and each of
-    /// them, so a row has to say which way the money goes without a "you" on
-    /// both sides of it.
-    private func standing(_ balance: GroupBalance) -> String {
-        let amount = Money.rupees(abs(balance.paise))
-        if balance.isMine {
-            return balance.isOwed ? "you're owed \(amount)" : "you owe \(amount)"
-        }
-        return balance.isOwed ? "is owed \(amount)" : "owes \(amount)"
     }
 
     private func expenseRow(_ expense: Expense) -> some View {

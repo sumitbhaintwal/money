@@ -17,13 +17,13 @@ enum GroupExport {
         lines.append(subtitle(group))
         lines.append("")
 
-        let balances = Groups.settlement(in: group)
-        if balances.isEmpty {
-            lines.append("Everyone is settled up.")
+        let transfers = Groups.settleUp(in: group)
+        if transfers.isEmpty {
+            lines.append("Everyone is square.")
         } else {
-            lines.append("WHO OWES WHAT")
-            for balance in balances {
-                lines.append(standing(balance))
+            lines.append("SETTLE UP")
+            for transfer in transfers {
+                lines.append("\(transfer.fromName) pays \(transfer.toName) \(Money.rupees(transfer.paise))")
             }
         }
 
@@ -38,16 +38,6 @@ enum GroupExport {
         }
 
         return lines.joined(separator: "\n")
-    }
-
-    /// Written for whoever is reading it in the group chat, so it names both
-    /// sides rather than assuming the reader is me.
-    private static func standing(_ balance: GroupBalance) -> String {
-        let amount = Money.rupees(abs(balance.paise))
-        if balance.isMine {
-            return balance.isOwed ? "You are owed \(amount)" : "You owe \(amount)"
-        }
-        return balance.isOwed ? "\(balance.name) is owed \(amount)" : "\(balance.name) owes \(amount)"
     }
 
     private static func subtitle(_ group: ExpenseGroup) -> String {
@@ -110,11 +100,11 @@ enum GroupExport {
         rows.append([])
         rows.append(["", "Total", String(Groups.totalPaise(group) / 100), "", "", "", ""])
         rows.append(["", "Your share", String(Groups.mySharePaise(group) / 100), "", "", "", ""])
-        for balance in Groups.settlement(in: group) {
+        for transfer in Groups.settleUp(in: group) {
             rows.append([
                 "",
-                balance.isOwed ? "\(balance.name) is owed" : "\(balance.name) owes",
-                String(abs(balance.paise) / 100),
+                "\(transfer.fromName) pays \(transfer.toName)",
+                String(transfer.paise / 100),
                 "", "", "", "",
             ])
         }
