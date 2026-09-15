@@ -6,7 +6,7 @@ struct GroupEditorView: View {
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
-    @Query(filter: #Predicate<Person> { $0.removedAt == nil }, sort: \Person.name)
+    @Query(filter: #Predicate<Person> { $0.removedAt == nil && $0.deletedAt == nil }, sort: \Person.name)
     private var people: [Person]
 
     @State private var name: String
@@ -154,7 +154,8 @@ struct GroupEditorView: View {
         let members = people.filter { chosen.contains($0.persistentModelID) }
         if let group {
             group.name = trimmedName
-            group.members = members
+            group.storedMembers = members
+            group.touch()
         } else {
             context.insert(ExpenseGroup(name: trimmedName, members: members))
         }
@@ -164,14 +165,23 @@ struct GroupEditorView: View {
 
     private func toggleClosed(_ group: ExpenseGroup) {
         group.closedAt = group.isOpen ? .now : nil
+        group.touch()
         try? context.save()
         dismiss()
     }
 
-    /// The relationship nullifies, so the expenses survive without a group.
+    /// A tombstone rather than a delete, so the other phone learns the trip is
+    /// gone instead of quietly keeping it. The expenses are let go of first —
+    /// the nullify rule cannot fire on a row that is still there.
     private func deleteGroup() {
         guard let group else { return }
-        context.delete(group)
+        for expense in group.storedExpenses {
+            expense.group = nil
+            expense.touch()
+        }
+        group.storedExpenses = []
+        group.storedMembers = []
+        group.tombstone()
         try? context.save()
         dismiss()
     }

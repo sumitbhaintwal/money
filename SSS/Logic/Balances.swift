@@ -81,6 +81,7 @@ enum Balances {
     static func settle(with person: Person, in expenses: [Expense], on date: Date = .now) {
         for share in openShares(with: person, in: expenses) {
             share.settledAt = date
+            share.touch()
         }
     }
 }
@@ -112,12 +113,16 @@ extension Balances {
         now: Date = .now
     ) {
         settle(with: person, in: expenses, on: now)
+        for group in person.groups { group.touch(now) }
         person.groups.removeAll()
 
         if appearsAnywhere(person, in: expenses) {
             person.removedAt = now
+            person.touch(now)
         } else {
-            context.delete(person)
+            // A tombstone rather than a delete, so the other phone stops showing
+            // them too. Safe here precisely because they are in no split.
+            person.tombstone(now)
         }
     }
 }

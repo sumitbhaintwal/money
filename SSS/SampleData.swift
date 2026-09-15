@@ -38,7 +38,7 @@ enum SampleData {
             )
             context.insert(expense)
             shares.forEach(context.insert)
-            if !shares.isEmpty { expense.shares = shares }
+            if !shares.isEmpty { expense.storedShares = shares }
         }
 
         // Arjun fronted the cab; my ₹320 is still outstanding.

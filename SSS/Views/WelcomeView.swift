@@ -30,7 +30,7 @@ struct WelcomeView: View {
             .buttonStyle(.glassProminent)
             .tint(Theme.lit)
 
-            Text("Your ledger stays on this phone.")
+            Text("Your ledger follows your account, not this phone.")
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.dim)
                 .frame(maxWidth: .infinity)

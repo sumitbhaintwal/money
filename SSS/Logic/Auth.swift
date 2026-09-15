@@ -155,6 +155,10 @@ final class SessionStore {
     private let tokenKey = "sss.token"
     private let auth: AuthService
 
+    /// For the sync engine, which needs to sign its own requests. Still only
+    /// ever read from the Keychain.
+    var bearerToken: String? { token }
+
     /// Never written to disk outside the Keychain.
     private var token: String? {
         get { Keychain.get(tokenKey) }

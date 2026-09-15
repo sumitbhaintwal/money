@@ -5,7 +5,8 @@ struct TodayView: View {
     let showPeople: () -> Void
 
     @Environment(\.modelContext) private var context
-    @Query(sort: \Expense.spentAt, order: .reverse) private var expenses: [Expense]
+    @Query(filter: #Predicate<Expense> { $0.deletedAt == nil }, sort: \Expense.spentAt, order: .reverse)
+    private var expenses: [Expense]
     @State private var selectedDay: Date = Ledger.calendar.startOfDay(for: .now)
     @State private var visibleMonth: Date = Ledger.calendar.startOfDay(for: .now)
     @State private var showingDay = false

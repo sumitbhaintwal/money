@@ -2,10 +2,11 @@ import SwiftUI
 import SwiftData
 
 struct MoneyView: View {
-    @Query(sort: \Expense.spentAt, order: .reverse) private var expenses: [Expense]
-    @Query(filter: #Predicate<Person> { $0.removedAt == nil }, sort: \Person.name)
+    @Query(filter: #Predicate<Expense> { $0.deletedAt == nil }, sort: \Expense.spentAt, order: .reverse)
+    private var expenses: [Expense]
+    @Query(filter: #Predicate<Person> { $0.removedAt == nil && $0.deletedAt == nil }, sort: \Person.name)
     private var people: [Person]
-    @Query private var allGroups: [ExpenseGroup]
+    @Query(filter: #Predicate<ExpenseGroup> { $0.deletedAt == nil }) private var allGroups: [ExpenseGroup]
 
     @State private var query = ExpenseQuery()
     @State private var editing: Expense?

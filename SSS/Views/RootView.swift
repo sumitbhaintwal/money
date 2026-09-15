@@ -53,7 +53,8 @@ struct MainTabsView: View {
 /// Lives in the tab bar's accessory slot, so logging is one tap from anywhere
 /// and the bar itself carries the number you are trying to keep down.
 private struct AddAccessory: View {
-    @Query(sort: \Expense.spentAt, order: .reverse) private var expenses: [Expense]
+    @Query(filter: #Predicate<Expense> { $0.deletedAt == nil }, sort: \Expense.spentAt, order: .reverse)
+    private var expenses: [Expense]
     let onAdd: () -> Void
 
     private var todayPaise: Int {

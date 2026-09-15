@@ -2,8 +2,9 @@ import SwiftUI
 import SwiftData
 
 struct PeopleView: View {
-    @Query(sort: \Expense.spentAt, order: .reverse) private var expenses: [Expense]
-    @Query private var allGroups: [ExpenseGroup]
+    @Query(filter: #Predicate<Expense> { $0.deletedAt == nil }, sort: \Expense.spentAt, order: .reverse)
+    private var expenses: [Expense]
+    @Query(filter: #Predicate<ExpenseGroup> { $0.deletedAt == nil }) private var allGroups: [ExpenseGroup]
     @State private var settling: PersonBalance?
     @State private var managing = false
     @State private var creatingGroup = false
@@ -40,7 +41,7 @@ struct PeopleView: View {
             .scrollEdgeEffectStyle(.soft, for: .bottom)
             .padding(.top, 34)
 
-            Text("Balances live on this phone. Nobody else needs the app — remind sends a message, pay opens UPI.")
+            Text("Balances live in your account, on every phone you sign into. Nobody else needs the app — remind sends a message, pay opens UPI.")
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.dim)
                 .fixedSize(horizontal: false, vertical: true)

@@ -4,9 +4,9 @@ import SwiftData
 struct AddExpenseView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
-    @Query(filter: #Predicate<Person> { $0.removedAt == nil }, sort: \Person.createdAt)
+    @Query(filter: #Predicate<Person> { $0.removedAt == nil && $0.deletedAt == nil }, sort: \Person.createdAt)
     private var people: [Person]
-    @Query private var allGroups: [ExpenseGroup]
+    @Query(filter: #Predicate<ExpenseGroup> { $0.deletedAt == nil }) private var allGroups: [ExpenseGroup]
 
     private enum Field { case amount, note }
 
@@ -18,6 +18,8 @@ struct AddExpenseView: View {
     @State private var includesMe = true
     @State private var chosen: Set<PersistentIdentifier> = []
     @State private var groupID: PersistentIdentifier?
+    /// nil is me, which is the answer almost every time.
+    @State private var payerID: PersistentIdentifier?
     @State private var addingPerson = false
     @State private var newPersonName = ""
     @FocusState private var focus: Field?
@@ -35,6 +37,7 @@ struct AddExpenseView: View {
         _includesMe = State(initialValue: shares.isEmpty || shares.contains { $0.person == nil })
         _chosen = State(initialValue: Set((editing?.shares ?? []).compactMap { $0.person?.persistentModelID }))
         _groupID = State(initialValue: editing?.group?.persistentModelID)
+        _payerID = State(initialValue: editing?.payer?.persistentModelID)
     }
 
     var body: some View {
@@ -42,22 +45,22 @@ struct AddExpenseView: View {
             headerRow.padding(.horizontal, 24).padding(.top, 22)
             amountRow.padding(.top, 34)
             noteField.padding(.horizontal, 24).padding(.top, 32)
-            chips.padding(.horizontal, 24).padding(.top, 18)
-            if !selectableGroups.isEmpty { groupChips.padding(.top, 10) }
-
-            // Scrolls rather than grows: six people plus the covering note
-            // overflowed the sheet, clipping the header and pushing the save
-            // button off the bottom edge.
-            if isSplit {
-                ScrollView {
-                    peoplePane
-                        .padding(.horizontal, 24)
-                        .padding(.top, 26)
-                        .padding(.bottom, 4)
+            // Scrolls rather than grows: the chips, a payer, a trip and six
+            // people overflowed the sheet, clipping the header and pushing the
+            // save button off the bottom edge.
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    chips.padding(.horizontal, 24).padding(.top, 18)
+                    if !payerChoices.isEmpty { payerRow.padding(.top, 16) }
+                    if !selectableGroups.isEmpty { groupRow.padding(.top, 16) }
+                    if isSplit {
+                        peoplePane.padding(.horizontal, 24).padding(.top, 24)
+                    }
                 }
-                .scrollIndicators(.hidden)
-                .scrollBounceBehavior(.basedOnSize)
+                .padding(.bottom, 4)
             }
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
 
             Spacer(minLength: 0)
             saveButton.padding(.horizontal, 24).padding(.top, 16).padding(.bottom, 12)
@@ -156,24 +159,64 @@ struct AddExpenseView: View {
         }
     }
 
+    /// Everyone who could have fronted this, plus whoever already did — a
+    /// person removed since is still the truth about an old expense.
+    private var payerChoices: [Person] {
+        let listed = people.filter { $0.isActive }
+        if let payerID, !listed.contains(where: { $0.persistentModelID == payerID }),
+           let current = people.first(where: { $0.persistentModelID == payerID }) {
+            return listed + [current]
+        }
+        return listed
+    }
+
+    private var payerRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label9("PAID BY", size: 11).padding(.horizontal, 24)
+            ScrollView(.horizontal) {
+                HStack(spacing: 8) {
+                    Chip(title: "YOU", isOn: payerID == nil) { payerID = nil }
+                    ForEach(payerChoices) { person in
+                        Chip(
+                            title: person.name.uppercased(),
+                            isOn: payerID == person.persistentModelID
+                        ) {
+                            payerID = person.persistentModelID
+                        }
+                    }
+                }
+                .padding(.horizontal, 24)
+            }
+            .scrollIndicators(.hidden)
+        }
+    }
+
     /// Open trips, plus whatever this expense is already filed under.
     private var selectableGroups: [ExpenseGroup] {
         Groups.sorted(allGroups.filter { $0.isOpen || $0.persistentModelID == groupID })
     }
 
-    private var groupChips: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 8) {
-                Chip(title: "NO GROUP", isOn: groupID == nil) { groupID = nil }
-                ForEach(selectableGroups) { group in
-                    Chip(title: group.name.uppercased(), isOn: groupID == group.persistentModelID) {
-                        pick(group)
+    private var groupRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label9("TRIP", size: 11).padding(.horizontal, 24)
+            ScrollView(.horizontal) {
+                HStack(spacing: 8) {
+                    Chip(title: "NO GROUP", isOn: groupID == nil) { groupID = nil }
+                    ForEach(selectableGroups) { group in
+                        Chip(title: group.name.uppercased(), isOn: groupID == group.persistentModelID) {
+                            pick(group)
+                        }
                     }
                 }
+                .padding(.horizontal, 24)
             }
-            .padding(.horizontal, 24)
+            .scrollIndicators(.hidden)
         }
-        .scrollIndicators(.hidden)
+    }
+
+    private var selectedPayer: Person? {
+        guard let payerID else { return nil }
+        return people.first { $0.persistentModelID == payerID }
     }
 
     /// Choosing a trip pre-selects the people on it — splitting the same bill
@@ -372,6 +415,7 @@ struct AddExpenseView: View {
 
     private func save() {
         guard canSave else { return }
+        let now = Date.now
         let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
 
         let expense: Expense
@@ -386,18 +430,23 @@ struct AddExpenseView: View {
                     alreadySettled[person.persistentModelID] = settled
                 }
             }
-            editing.shares.forEach(context.delete)
-            editing.shares = []
+            // Tombstoned rather than deleted, and left attached, so the
+            // other phone is told these shares are gone. The sync clears them
+            // out for real once the server has acknowledged them.
+            editing.shares.forEach { $0.tombstone(now) }
             expense.amountPaise = amountPaise
             expense.note = trimmed
             expense.isEssential = isEssential
             expense.group = selectedGroup
+            expense.payer = selectedPayer
+            expense.touch(now)
         } else {
             expense = Expense(
                 amountPaise: amountPaise,
                 note: trimmed,
                 spentAt: .now,
                 isEssential: isEssential,
+                payer: selectedPayer,
                 group: selectedGroup
             )
             context.insert(expense)
@@ -418,7 +467,14 @@ struct AddExpenseView: View {
                 ))
             }
             rows.forEach(context.insert)
-            expense.shares = rows
+            expense.storedShares.append(contentsOf: rows)
+        } else if selectedPayer != nil {
+            // Somebody else paid and it was not divided, so the whole bill is
+            // mine and owed to them. Balances read what I owe off my own share,
+            // so without this row the debt would not exist anywhere.
+            let mine = Share(amountPaise: amountPaise)
+            context.insert(mine)
+            expense.storedShares.append(mine)
         }
 
         try? context.save()

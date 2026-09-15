@@ -7,7 +7,7 @@ struct SettleView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
-    @Query private var expenses: [Expense]
+    @Query(filter: #Predicate<Expense> { $0.deletedAt == nil }) private var expenses: [Expense]
 
     private enum Step { case pick, confirm, done }
     @State private var step: Step = .pick
@@ -77,7 +77,7 @@ struct SettleView: View {
         switch step {
         case .pick:    return balance.reason
         case .confirm: return "we cannot see UPI, so you tell us"
-        case .done:    return "recorded on this phone"
+        case .done:    return "recorded in your account"
         }
     }
 
@@ -192,7 +192,7 @@ struct SettleView: View {
         case .confirm:
             return "Nothing is marked paid until you say so. A ledger that guesses is worse than one that asks."
         case .done:
-            return "Recorded on this phone. Nothing was sent anywhere."
+            return "Recorded in your account. Nothing was sent to them."
         }
     }
 

@@ -7,7 +7,8 @@ struct DayDrawerView: View {
     let date: Date
 
     @Environment(\.modelContext) private var context
-    @Query(sort: \Expense.spentAt, order: .reverse) private var expenses: [Expense]
+    @Query(filter: #Predicate<Expense> { $0.deletedAt == nil }, sort: \Expense.spentAt, order: .reverse)
+    private var expenses: [Expense]
     @State private var editing: Expense?
 
     private let cal = Ledger.calendar
@@ -94,7 +95,11 @@ struct DayDrawerView: View {
         .onTapGesture { editing = expense }
         .contextMenu {
             Button("Delete", systemImage: "trash", role: .destructive) {
-                context.delete(expense)
+                // Tombstoned, not deleted: a row that is simply gone looks
+                // exactly like one the other phone has never seen.
+                let now = Date.now
+                expense.storedShares.forEach { $0.tombstone(now) }
+                expense.tombstone(now)
                 try? context.save()
             }
         }

@@ -2,7 +2,9 @@ import Foundation
 import SwiftData
 
 @Model
-final class Expense {
+final class Expense: Syncable {
+    @Attribute(.unique) var id: UUID = UUID()
+
     var amountPaise: Int
     var note: String
     var spentAt: Date
@@ -17,8 +19,14 @@ final class Expense {
     /// The trip or outing this belongs to, if any.
     var group: ExpenseGroup?
 
+    var updatedAt: Date = Date.now
+    var deletedAt: Date?
+    var syncedUpdatedAt: Date?
+
+    /// Includes tombstones, which linger until the server has been told about
+    /// them. Read `shares` instead; assign to this one.
     @Relationship(deleteRule: .cascade, inverse: \Share.expense)
-    var shares: [Share]
+    var storedShares: [Share]
 
     init(
         amountPaise: Int,
@@ -27,16 +35,24 @@ final class Expense {
         isEssential: Bool = false,
         payer: Person? = nil,
         group: ExpenseGroup? = nil,
-        shares: [Share] = []
+        shares: [Share] = [],
+        id: UUID = UUID(),
+        updatedAt: Date = .now
     ) {
+        self.id = id
         self.amountPaise = amountPaise
         self.note = note
         self.spentAt = spentAt
         self.isEssential = isEssential
         self.payer = payer
         self.group = group
-        self.shares = shares
+        self.storedShares = shares
+        self.updatedAt = Millis.round(updatedAt)
     }
+
+    /// The shares that still count. A deleted share keeps its row until it has
+    /// been pushed, and counting it would move every total in the app.
+    var shares: [Share] { storedShares.filter { $0.deletedAt == nil } }
 
     /// Somebody other than me has a portion. Not `shares.count > 1`: covering a
     /// friend's ₹500 entirely is one share, and still very much a split.

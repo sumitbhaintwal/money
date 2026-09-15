@@ -3,9 +3,9 @@ import SwiftData
 
 struct PeopleManagerView: View {
     @Environment(\.dismiss) private var dismiss
-    @Query(filter: #Predicate<Person> { $0.removedAt == nil }, sort: \Person.name)
+    @Query(filter: #Predicate<Person> { $0.removedAt == nil && $0.deletedAt == nil }, sort: \Person.name)
     private var people: [Person]
-    @Query private var expenses: [Expense]
+    @Query(filter: #Predicate<Expense> { $0.deletedAt == nil }) private var expenses: [Expense]
 
     @State private var editingPerson: Person?
     @State private var addingPerson = false
@@ -114,7 +114,7 @@ struct PersonEditorView: View {
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
-    @Query private var expenses: [Expense]
+    @Query(filter: #Predicate<Expense> { $0.deletedAt == nil }) private var expenses: [Expense]
 
     @State private var name: String
     @State private var upi: String
@@ -226,6 +226,7 @@ struct PersonEditorView: View {
         if let person {
             person.name = trimmedName
             person.upiID = cleanedUPI.isEmpty ? nil : cleanedUPI
+            person.touch()
         } else {
             context.insert(Person(name: trimmedName, upiID: cleanedUPI.isEmpty ? nil : cleanedUPI))
         }

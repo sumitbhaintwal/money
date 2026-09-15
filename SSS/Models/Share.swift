@@ -5,7 +5,9 @@ import SwiftData
 /// equal, uneven, percentage and "I'll cover Ravi's part" are all the same shape
 /// and the balance query stays a single sum.
 @Model
-final class Share {
+final class Share: Syncable {
+    @Attribute(.unique) var id: UUID = UUID()
+
     var amountPaise: Int
 
     /// nil means this is my own portion.
@@ -14,10 +16,22 @@ final class Share {
     var settledAt: Date?
     var expense: Expense?
 
-    init(amountPaise: Int, person: Person? = nil, settledAt: Date? = nil) {
+    var updatedAt: Date = Date.now
+    var deletedAt: Date?
+    var syncedUpdatedAt: Date?
+
+    init(
+        amountPaise: Int,
+        person: Person? = nil,
+        settledAt: Date? = nil,
+        id: UUID = UUID(),
+        updatedAt: Date = .now
+    ) {
+        self.id = id
         self.amountPaise = amountPaise
         self.person = person
         self.settledAt = settledAt
+        self.updatedAt = Millis.round(updatedAt)
     }
 
     var isMine: Bool { person == nil }
