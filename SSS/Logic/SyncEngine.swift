@@ -10,10 +10,14 @@ import SwiftData
 /// SwiftData immediately; this pushes it up afterwards and pulls down whatever
 /// the other device did.
 ///
-/// Conflicts are last-write-wins on `updatedAt`. That is the right call here and
-/// not a shortcut: the only way two rows can disagree is one person editing the
-/// same expense on their phone and their iPad, and the later edit is the one
-/// they meant.
+/// The account is the record. Anything that comes down overwrites what is here,
+/// so this phone never quietly shows a value the server disagrees with. The only
+/// thing held back is a row with unsent changes, which is on its way up and
+/// resolves on the next pass.
+///
+/// Two devices writing the same row is still settled by `updatedAt`, but on the
+/// server, where one clock decides. A push that loses comes back down as the
+/// winner's version rather than sitting here as a local edit nobody else has.
 @MainActor
 @Observable
 final class SyncEngine {
@@ -238,8 +242,7 @@ final class SyncEngine {
         var sharesByID = index(fetch(Share.self))
 
         for dto in remote.people {
-            let stamp = Millis.date(dto.updatedAt)
-            guard let person = resolve(dto.id, in: &peopleByID, stamp: stamp, deleted: dto.deletedAt != nil, make: {
+            guard let person = resolve(dto.id, in: &peopleByID, deleted: dto.deletedAt != nil, make: {
                 let fresh = Person(name: dto.name, createdAt: Millis.date(dto.createdAt), id: dto.id)
                 context.insert(fresh)
                 return fresh
@@ -253,8 +256,7 @@ final class SyncEngine {
         }
 
         for dto in remote.groups {
-            let stamp = Millis.date(dto.updatedAt)
-            guard let group = resolve(dto.id, in: &groupsByID, stamp: stamp, deleted: dto.deletedAt != nil, make: {
+            guard let group = resolve(dto.id, in: &groupsByID, deleted: dto.deletedAt != nil, make: {
                 let fresh = ExpenseGroup(name: dto.name, createdAt: Millis.date(dto.createdAt), id: dto.id)
                 context.insert(fresh)
                 return fresh
@@ -268,8 +270,7 @@ final class SyncEngine {
         }
 
         for dto in remote.expenses {
-            let stamp = Millis.date(dto.updatedAt)
-            guard let expense = resolve(dto.id, in: &expensesByID, stamp: stamp, deleted: dto.deletedAt != nil, make: {
+            guard let expense = resolve(dto.id, in: &expensesByID, deleted: dto.deletedAt != nil, make: {
                 let fresh = Expense(
                     amountPaise: dto.amountPaise,
                     note: dto.note,
@@ -295,7 +296,7 @@ final class SyncEngine {
             // better than attaching it to nothing.
             guard let expense = expensesByID[dto.expenseID] else { continue }
             let stamp = Millis.date(dto.updatedAt)
-            guard let share = resolve(dto.id, in: &sharesByID, stamp: stamp, deleted: dto.deletedAt != nil, make: {
+            guard let share = resolve(dto.id, in: &sharesByID, deleted: dto.deletedAt != nil, make: {
                 let fresh = Share(amountPaise: dto.amountPaise, id: dto.id, updatedAt: stamp)
                 context.insert(fresh)
                 fresh.expense = expense
@@ -312,19 +313,27 @@ final class SyncEngine {
 
     /// Finds the local row, creates it, or declines — whichever is right.
     ///
-    /// Declining covers two cases. A tombstone for a row this device never had
-    /// is nothing to do: creating it just to mark it deleted would resurrect
-    /// rows that were already purged. And a local row with a newer stamp wins,
-    /// because it is the edit that happened later.
+    /// The server is the record: a row that already exists here is overwritten
+    /// with what came down, without comparing stamps. The phone never quietly
+    /// keeps a value the account disagrees with. This also fixes a real hole in
+    /// the old last-write-wins rule — a push the server rejected as stale left
+    /// this device showing its rejected edit forever, because the version that
+    /// came back was older and so was ignored.
+    ///
+    /// Declining covers two cases. A row with unsent changes is left alone: the
+    /// pull is taken before the push is applied, so the version that came down
+    /// predates the edit that is on its way up. It comes back on the next sync,
+    /// clean by then, and the server's answer lands. And a tombstone for a row
+    /// this device never had is nothing to do — creating it just to mark it
+    /// deleted would resurrect rows that were already purged.
     private func resolve<T: Syncable>(
         _ id: UUID,
         in known: inout [UUID: T],
-        stamp: Date,
         deleted: Bool,
         make: () -> T
     ) -> T? {
         if let existing = known[id] {
-            guard stamp > existing.updatedAt else { return nil }
+            guard !existing.isDirty else { return nil }
             return existing
         }
         guard !deleted else { return nil }
